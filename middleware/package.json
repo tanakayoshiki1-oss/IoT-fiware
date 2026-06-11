@@ -1,0 +1,15 @@
+{
+  "name": "line-picarx-middleware",
+  "version": "1.0.0",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "castv2-client": "^1.2.0",
+    "express": "^4.19.2",
+    "google-home-player": "^1.0.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}

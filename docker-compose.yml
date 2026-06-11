@@ -1,0 +1,27 @@
+name: line-picarx
+
+services:
+  middleware:
+    build: ./middleware
+    container_name: line-picarx-middleware
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    volumes:
+      - photos:/app/photos
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - fiware-base-net
+      - default
+
+volumes:
+  photos:
+    name: line_picarx_photos
+
+networks:
+  fiware-base-net:
+    external: true
+    name: fiware-base-net
