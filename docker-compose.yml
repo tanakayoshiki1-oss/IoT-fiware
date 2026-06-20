@@ -19,6 +19,7 @@ services:
 
 volumes:
   photos:
+    external: true
     name: line_picarx_photos
 
 networks:
