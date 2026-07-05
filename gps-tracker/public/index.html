@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPSトラッカー</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f0f0f0; }
+    #header { background: #2c3e50; color: white; padding: 12px 16px; }
+    #header h1 { font-size: 18px; }
+    #status { font-size: 12px; margin-top: 4px; opacity: 0.8; }
+    #controls { display: flex; gap: 8px; padding: 12px 16px; background: white; border-bottom: 1px solid #ddd; }
+    button { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    #btnStart { background: #27ae60; color: white; }
+    #btnStop  { background: #e74c3c; color: white; }
+    #btnPhoto { background: #f39c12; color: white; flex: 0.6; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #map { height: calc(100vh - 120px); }
+    #info { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.7); color: white; padding: 8px 16px;
+            border-radius: 20px; font-size: 13px; z-index: 1000; display: none; }
+    .photo-marker { font-size: 24px; text-align: center; line-height: 1; }
+    .photo-popup img { max-width: 220px; max-height: 220px; display: block; border-radius: 6px; }
+    .photo-popup small { display: block; margin-top: 4px; color: #666; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <h1>📍 GPSルートトラッカー</h1>
+    <div id="status">待機中</div>
+  </div>
+  <div id="controls">
+    <button id="btnStart" onclick="startTracking()">▶ スタート</button>
+    <button id="btnStop"  onclick="stopTracking()" disabled>■ エンド</button>
+    <button id="btnPhoto" onclick="document.getElementById('photoInput').click()">📷 写真</button>
+  </div>
+  <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="uploadPhoto(this)">
+  <div id="map"></div>
+  <div id="info"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/exifr/dist/lite.umd.js"></script>
+  <script>
+    const map = L.map('map').setView([43.0646, 141.3468], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    let watchId = null;
+    let polyline = L.polyline([], { color: '#e74c3c', weight: 4 }).addTo(map);
+    let marker = null;
+    let points = [];
+    const INTERVAL_MS = 5000;
+    let lastSent = 0;
+    let currentLat = null;
+    let currentLng = null;
+
+    const photoIcon = L.divIcon({
+      html: '<div style="background:#e67e22;border:2px solid white;border-radius:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 5px rgba(0,0,0,0.5);">📷</div>',
+      className: '',
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+      popupAnchor: [0, -19],
+    });
+
+    function setStatus(text) {
+      document.getElementById('status').textContent = text;
+    }
+
+    function showInfo(text) {
+      const el = document.getElementById('info');
+      el.textContent = text;
+      el.style.display = 'block';
+    }
+
+    function addPhotoMarker(lat, lng, url, timestamp) {
+      const time = new Date(timestamp).toLocaleString('ja-JP');
+      L.marker([lat, lng], { icon: photoIcon })
+        .bindPopup(`<div class="photo-popup"><img src="${url}"><small>${time}</small></div>`)
+        .addTo(map);
+    }
+
+    // 起動時に保存済み写真を読み込む
+    fetch('photos-list')
+      .then(r => r.json())
+      .then(list => list.forEach(p => addPhotoMarker(p.lat, p.lng, p.url, p.timestamp)))
+      .catch(() => {});
+
+    async function sendLocation(lat, lng, speed, accuracy) {
+      try {
+        await fetch('location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lng, speed, accuracy })
+        });
+      } catch (e) {
+        console.error('送信エラー:', e);
+      }
+    }
+
+    function startTracking() {
+      if (!navigator.geolocation) {
+        alert('このブラウザはGeolocationに対応していません');
+        return;
+      }
+      points = [];
+      polyline.setLatLngs([]);
+      document.getElementById('btnStart').disabled = true;
+      document.getElementById('btnStop').disabled = false;
+      setStatus('トラッキング中...');
+
+      fetch('tracking', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({active: true}) });
+
+      watchId = navigator.geolocation.watchPosition(pos => {
+        const { latitude: lat, longitude: lng, speed, accuracy } = pos.coords;
+        const now = Date.now();
+        currentLat = lat;
+        currentLng = lng;
+
+        points.push([lat, lng]);
+        polyline.setLatLngs(points);
+        map.setView([lat, lng]);
+
+        if (marker) marker.setLatLng([lat, lng]);
+        else marker = L.circleMarker([lat, lng], { radius: 8, color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 1 }).addTo(map);
+
+        showInfo(`📍 ${lat.toFixed(5)}, ${lng.toFixed(5)} | 精度: ${Math.round(accuracy)}m`);
+
+        if (now - lastSent >= INTERVAL_MS) {
+          lastSent = now;
+          sendLocation(lat, lng, speed || 0, accuracy);
+          setStatus(`送信済み ${new Date().toLocaleTimeString('ja-JP')}`);
+        }
+      }, err => {
+        setStatus('位置情報エラー: ' + err.message);
+      }, { enableHighAccuracy: true, maximumAge: 0 });
+    }
+
+    function stopTracking() {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('btnStop').disabled = true;
+      setStatus(`完了 - ${points.length}ポイント記録`);
+      fetch('tracking', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({active: false}) });
+    }
+
+    async function uploadPhoto(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      setStatus('EXIF確認中...');
+
+      let lat = null;
+      let lng = null;
+      let source = '';
+
+      // ① 写真の EXIF GPS を読む
+      try {
+        const gps = await exifr.gps(file);
+        if (gps && gps.latitude && gps.longitude) {
+          lat = gps.latitude;
+          lng = gps.longitude;
+          source = 'EXIF';
+        }
+      } catch (e) { /* EXIFなし or 非対応フォーマット */ }
+
+      // ② トラッキング中の現在地
+      if (lat === null && currentLat !== null) {
+        lat = currentLat;
+        lng = currentLng;
+        source = 'トラッキング位置';
+      }
+
+      // ③ ブラウザ位置情報を取得
+      if (lat === null) {
+        setStatus('現在地取得中...');
+        try {
+          const pos = await new Promise((resolve, reject) =>
+            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 })
+          );
+          lat = pos.coords.latitude;
+          lng = pos.coords.longitude;
+          source = '現在地';
+        } catch (e) {
+          alert('位置情報を取得できませんでした: ' + e.message);
+          setStatus('待機中');
+          input.value = '';
+          return;
+        }
+      }
+
+      setStatus(`アップロード中... (${source})`);
+      try {
+        const formData = new FormData();
+        formData.append('photo', file);
+        formData.append('lat', lat);
+        formData.append('lng', lng);
+
+        const resp = await fetch('photo', { method: 'POST', body: formData });
+        const data = await resp.json();
+
+        addPhotoMarker(data.lat, data.lng, data.url, data.timestamp);
+        map.setView([data.lat, data.lng]);
+        setStatus(`写真を追加しました（${source}）`);
+      } catch (e) {
+        alert('アップロードに失敗しました: ' + e.message);
+        setStatus('待機中');
+      }
+      input.value = '';
+    }
+  </script>
+</body>
+</html>

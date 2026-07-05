@@ -17,10 +17,29 @@ services:
       - fiware-base-net
       - default
 
+  gps-tracker:
+    build: ./gps-tracker
+    container_name: iot-fiware-gps-tracker
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      - ORION_URL=http://orion:1026
+    volumes:
+      - gps_photos:/app/public/photos
+      - gps_data:/app/data
+    networks:
+      - fiware-base-net
+      - default
+
 volumes:
   photos:
     external: true
     name: line_picarx_photos
+  gps_photos:
+    name: iot_fiware_gps_photos
+  gps_data:
+    name: iot_fiware_gps_data
 
 networks:
   fiware-base-net:

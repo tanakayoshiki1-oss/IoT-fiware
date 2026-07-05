@@ -48,6 +48,7 @@
 | コンポーネント | 場所 | 役割 |
 |---------------|------|------|
 | line-server | `line-server/` / Docker（ポート 3001） | LINE Webhook 受信、Google Home 制御、PiCar-X 連携、Orion 更新 |
+| gps-tracker | `gps-tracker/` / Docker（ポート 3003） | GPS 位置情報受信 Web UI、写真アップロード・地図表示、Orion 更新 |
 | camera_server.py | `picarx/` / PiCar-X 上（ポート 5000） | Vilib カメラで JPEG 撮影、Flask API |
 
 #### line-server ソース構成
