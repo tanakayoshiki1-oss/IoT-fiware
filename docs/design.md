@@ -47,13 +47,13 @@
 
 | コンポーネント | 場所 | 役割 |
 |---------------|------|------|
-| middleware | `middleware/` / Docker（ポート 3001） | LINE Webhook 受信、Google Home 制御、PiCar-X 連携、Orion 更新 |
-| camera_server.py | PiCar-X 上（ポート 5000） | Vilib カメラで JPEG 撮影、Flask API |
+| line-server | `line-server/` / Docker（ポート 3001） | LINE Webhook 受信、Google Home 制御、PiCar-X 連携、Orion 更新 |
+| camera_server.py | `picarx/` / PiCar-X 上（ポート 5000） | Vilib カメラで JPEG 撮影、Flask API |
 
-#### middleware ソース構成
+#### line-server ソース構成
 
 ```
-middleware/src/
+line-server/src/
 ├── server.js       # Express サーバー、Webhook ルーティング
 ├── googleHome.js   # TTS (google-home-player) / 音量 (castv2-client)
 ├── lineApi.js      # LINE Messaging API（テキスト返信・画像返信）

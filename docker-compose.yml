@@ -1,9 +1,9 @@
-name: line-picarx
+name: iot-fiware
 
 services:
-  middleware:
-    build: ./middleware
-    container_name: line-picarx-middleware
+  line-server:
+    build: ./line-server
+    container_name: iot-fiware-line-server
     restart: unless-stopped
     ports:
       - "3001:3001"
