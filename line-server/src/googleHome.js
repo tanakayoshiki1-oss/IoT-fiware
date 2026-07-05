@@ -4,8 +4,11 @@ const castv2 = require('castv2-client');
 const IP = process.env.GOOGLE_HOME_IP || '192.168.3.11';
 const player = new GoogleHomePlayer(IP, 'ja');
 
+// google-tts-api の TKK キー取得が Google の仕様変更で壊れているため
+// TTS URL を直接生成して player.play() に渡す
 function say(text) {
-  return player.say(text);
+  const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ja&client=tw-ob`;
+  return player.play(url);
 }
 
 function setVolume(level) {
