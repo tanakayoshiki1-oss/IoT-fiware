@@ -7,20 +7,21 @@
   スマートフォン（GPS / LINE）
        │
        ▼
-  Cloudflare Tunnel（cloudflared.exe）
+  Cloudflare Tunnel（cloudflared Windows サービス）
+  カスタムドメイン: codinghiker.com
        │
        ▼
-  nginx リバースプロキシ（C:\Projects\ngrok、ポート 8081）
+  nginx リバースプロキシ（C:\Projects\reverse-proxy、ポート 8081）
        │
        ├─ /gps/          → gps-tracker サーバー（ポート 3003）
-       ├─ /line-picarx/  → middleware サーバー（ポート 3001）★ IoT-fiware
+       ├─ /line-server/  → line-server（ポート 3001）★ IoT-fiware
        └─ /grafana-fiware/→ Grafana（ポート 4101）
               │
               ▼
        LINE Platform（Webhook POST）
               │
               ▼
-       middleware（Node.js / Docker）
+       line-server（Node.js / Docker）
               │
        ┌──────┴──────────────┐
        ▼                     ▼
@@ -30,7 +31,7 @@
 
 【データパイプライン】
   GPS スマートフォン → gps-tracker → FIWARE Orion
-  PiCar-X 写真 URL  → middleware  → FIWARE Orion
+  PiCar-X 写真 URL  → line-server  → FIWARE Orion
                                          │
                                     FIWARE Draco（Apache NiFi）
                                          │
@@ -38,6 +39,36 @@
                                          │
                                     Grafana（grafana-fiware）
 ```
+
+---
+
+## インフラ構成
+
+### Cloudflare Tunnel
+
+| 項目 | 値 |
+|------|-----|
+| ドメイン | `codinghiker.com`（Cloudflare Registrar） |
+| トンネル名 | `gps` |
+| 実行方式 | Windows サービス（cloudflared）自動起動 |
+| 実行ファイル | `C:\Projects\cloudflared.exe` |
+| 転送先 | `http://localhost:8081`（nginx） |
+
+### nginx リバースプロキシ
+
+| 項目 | 値 |
+|------|-----|
+| プロジェクト | `C:\Projects\reverse-proxy` |
+| コンテナ名 | `reverse-proxy` |
+| Docker | Docker Desktop（`restart: unless-stopped`） |
+| ポート | `127.0.0.1:8081:8080` |
+
+| 外部パス | 転送先 |
+|---------|--------|
+| `/gps/` | `localhost:3003` |
+| `/line-server/` | `localhost:3001` |
+| `/grafana-fiware/` | `localhost:4101` |
+| `/plateau-fiware/` | `localhost:4200` |
 
 ---
 
@@ -66,10 +97,9 @@ line-server/src/
 
 | プロジェクト | パス | 役割 |
 |-------------|------|------|
-| fiware-base | `C:\Projects\fiware-base` | Orion (ポート 4226) / Draco / PostgreSQL (ポート 4243) |
+| fiware-base | `C:\Projects\fiware-base` | Orion (ポート 1026) / Draco / PostgreSQL (ポート 4243) |
 | grafana-fiware | `C:\Projects\grafana-fiware` | Grafana (ポート 4101) / GPS ダッシュボード |
-| gps-tracker | `C:\Projects\gps-tracker` | GPS 位置情報受信サーバー（ポート 3003） |
-| ngrok | `C:\Projects\ngrok` | nginx リバースプロキシ + Cloudflare Tunnel |
+| reverse-proxy | `C:\Projects\reverse-proxy` | nginx リバースプロキシ（ポート 8081） |
 
 ---
 
@@ -80,9 +110,10 @@ line-server/src/
 ```
 LINE アプリ
   → LINE Platform (Webhook)
+  → codinghiker.com/line-server/webhook
   → Cloudflare Tunnel
-  → nginx (/line-picarx/)
-  → middleware POST /webhook
+  → nginx (/line-server/)
+  → line-server POST /webhook
   → googleHome.say(text)
   → Google Home Mini TTS
 ```
@@ -91,7 +122,7 @@ LINE アプリ
 
 ```
 LINE アプリ（!写真）
-  → middleware POST /webhook
+  → line-server POST /webhook
   → picarx.takePhoto()  GET http://192.168.3.17:5000/photo
   → 写真保存 /app/photos/photo_TIMESTAMP.jpg
   → orion.updatePhoto(photoUrl)  PATCH Orion PiCarX:001
@@ -102,7 +133,7 @@ LINE アプリ（!写真）
 ### フロー 3: スマートフォン GPS トラッキング
 
 ```
-スマートフォン ブラウザ（/gps/）
+スマートフォン ブラウザ（codinghiker.com/gps/）
   → navigator.geolocation.watchPosition()
   → POST /gps/location（5 秒ごと）
   → gps-tracker PATCH Orion Route:smartphone
@@ -142,7 +173,7 @@ LINE アプリ（!写真）
 
 ## API 仕様
 
-### middleware（ポート 3001）
+### line-server（ポート 3001）
 
 | メソッド | パス | 内容 |
 |----------|------|------|
@@ -170,15 +201,15 @@ LINE アプリ（!写真）
 
 ## 環境変数
 
-### middleware（`.env`）
+### line-server（`.env`）
 
 | 変数 | 説明 | 既定値 |
 |------|------|--------|
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API トークン | （要設定） |
 | `GOOGLE_HOME_IP` | Google Home Mini の LAN IP | `192.168.3.11` |
-| `ORION_URL` | FIWARE Orion エンドポイント | `http://orion:3226` |
-| `PICARX_URL` | PiCar-X カメラサーバー URL | `http://192.168.3.XX:5000` |
-| `PHOTO_BASE_URL` | 写真配信の公開 URL ベース | Cloudflare URL/line-picarx/photos |
+| `ORION_URL` | FIWARE Orion エンドポイント | `http://orion:1026` |
+| `PICARX_URL` | PiCar-X カメラサーバー URL | `http://192.168.3.17:5000` |
+| `PHOTO_BASE_URL` | 写真配信の公開 URL ベース | `https://codinghiker.com/line-server/photos` |
 | `FIWARE_SERVICE` | Orion fiware-service ヘッダー | `linepicarx` |
 | `FIWARE_SERVICEPATH` | Orion fiware-servicepath ヘッダー | `/picarx` |
 | `PORT` | サーバーポート | `3001` |
@@ -192,10 +223,11 @@ LINE アプリ（!写真）
 | LINE → Google Home 読み上げ | ✅ 完了 | 動作確認済み |
 | Google Home 音量コントロール | ✅ 完了 | !音量XX/+/- |
 | PiCar-X カメラ撮影 API | ✅ 完了 | camera_server.py |
-| !写真 → LINE 返信 | ✅ 実装済み | Channel Access Token 未設定 |
-| GPS トラッキング UI | ✅ 完了 | gps-tracker |
+| !写真 → LINE 返信 | ✅ 実装済み | PiCar-X 起動時に動作 |
+| GPS トラッキング UI | ✅ 完了 | codinghiker.com/gps/ |
 | Orion → PostgreSQL パイプライン | ✅ 完了 | Draco サブスクリプション済み |
 | Grafana GPS ルートマップ | ✅ 完了 | markers 表示 |
+| Cloudflare Tunnel（固定ドメイン） | ✅ 完了 | codinghiker.com / Windows サービス |
 | 画像 AI 解析（LLM） | 〇 予定 | Mac mini 到着後 |
 | スマートホーム制御（Tuya） | 〇 予定 | |
 | PiCar-X 移動制御 | 〇 予定 | |
@@ -204,7 +236,7 @@ LINE アプリ（!写真）
 
 ## 依存ライブラリ
 
-### middleware
+### line-server
 
 | パッケージ | 用途 |
 |-----------|------|
