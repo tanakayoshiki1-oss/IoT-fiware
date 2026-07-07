@@ -390,7 +390,7 @@
       const icon = isOwn ? myPhotoIcon : otherPhotoIcon;
       const m = L.marker([lat, lng], { icon })
         .bindPopup(`
-          <div class="photo-popup" data-url="${url}" data-time="${escapeHtml(time)}">
+          <div class="photo-popup" data-url="${url}" data-time="${escapeHtml(time)}" data-own="${isOwn}">
             <img src="${url}">
             <div class="rating-row">
               <div class="stars">${buildStars(rating || 0)}</div>
@@ -476,21 +476,27 @@
 
       const starsEl = popup.querySelector('.stars');
       const saveBtn = popup.querySelector('.save-rating');
+      const isOwn = popup.dataset.own === 'true';
       if (starsEl) {
         starsEl.innerHTML = buildStars(currentRating);
-        starsEl.onclick = function(ev) {
-          const star = ev.target.closest('.star');
-          if (!star) return;
-          currentRating = parseInt(star.dataset.val);
-          starsEl.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('filled', i < currentRating));
-        };
+        if (isOwn) {
+          starsEl.onclick = function(ev) {
+            const star = ev.target.closest('.star');
+            if (!star) return;
+            currentRating = parseInt(star.dataset.val);
+            starsEl.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('filled', i < currentRating));
+          };
+        } else {
+          starsEl.style.cursor = 'default';
+        }
       }
       if (saveBtn) {
-        saveBtn.onclick = function() {
+        if (!isOwn) { saveBtn.style.display = 'none'; }
+        else saveBtn.onclick = function() {
           fetch('photo-meta', {
             method: 'PATCH',
             headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ url: currentPopupUrl, rating: currentRating }),
+            body: JSON.stringify({ url: currentPopupUrl, rating: currentRating, deviceId }),
           }).then(r => r.json()).then(() => {
             const cached = photoMeta.get(currentPopupUrl) || {};
             photoMeta.set(currentPopupUrl, { ...cached, rating: currentRating });

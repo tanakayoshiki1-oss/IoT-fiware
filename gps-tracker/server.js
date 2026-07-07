@@ -170,9 +170,10 @@ app.get('/photo-detail', (req, res) => {
 });
 
 app.patch('/photo-meta', (req, res) => {
-  const { url, rating } = req.body;
+  const { url, rating, deviceId } = req.body;
   const idx = photosList.findIndex(p => p.url === url);
   if (idx === -1) return res.status(404).json({ error: 'not found' });
+  if (deviceId && photosList[idx].deviceId !== deviceId) return res.status(403).json({ error: 'forbidden' });
   photosList[idx].rating = rating;
   fs.writeFileSync(PHOTOS_DATA, JSON.stringify(photosList));
   res.json(photosList[idx]);
