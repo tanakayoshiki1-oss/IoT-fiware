@@ -12,10 +12,10 @@
     #header h1 { font-size: 18px; }
     #status { font-size: 12px; margin-top: 4px; opacity: 0.8; }
     #controls { display: flex; gap: 8px; padding: 12px 16px; background: white; border-bottom: 1px solid #ddd; }
-    button { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    button { flex: 1; padding: 14px 4px; border: none; border-radius: 8px; font-size: clamp(13px, 4vw, 16px); font-weight: bold; cursor: pointer; white-space: nowrap; }
     #btnStart { background: #27ae60; color: white; }
     #btnStop  { background: #e74c3c; color: white; }
-    #btnPhoto { background: #f39c12; color: white; flex: 0.6; }
+    #btnPhoto { background: #f39c12; color: white; }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
     #map { height: calc(100vh - 120px); }
     #info { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
@@ -43,6 +43,16 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/exifr/dist/lite.umd.js"></script>
   <script>
+    function getDeviceId() {
+      let id = localStorage.getItem('gps_device_id');
+      if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem('gps_device_id', id);
+      }
+      return id;
+    }
+    const deviceId = getDeviceId();
+
     const map = L.map('map').setView([43.0646, 141.3468], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap'
@@ -82,8 +92,13 @@
         .addTo(map);
     }
 
-    // 起動時に保存済み写真を読み込む
-    fetch('photos-list')
+    // 起動時: 前回位置に地図を移動 + このデバイスの写真を読み込む
+    fetch(`last-position?deviceId=${encodeURIComponent(deviceId)}`)
+      .then(r => r.json())
+      .then(pos => { if (pos) map.setView([pos.lat, pos.lng], 15); })
+      .catch(() => {});
+
+    fetch(`photos-list?deviceId=${encodeURIComponent(deviceId)}`)
       .then(r => r.json())
       .then(list => list.forEach(p => addPhotoMarker(p.lat, p.lng, p.url, p.timestamp)))
       .catch(() => {});
@@ -93,7 +108,7 @@
         await fetch('location', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat, lng, speed, accuracy })
+          body: JSON.stringify({ lat, lng, speed, accuracy, deviceId })
         });
       } catch (e) {
         console.error('送信エラー:', e);
@@ -111,7 +126,7 @@
       document.getElementById('btnStop').disabled = false;
       setStatus('トラッキング中...');
 
-      fetch('tracking', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({active: true}) });
+      fetch('tracking', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({active: true, deviceId}) });
 
       watchId = navigator.geolocation.watchPosition(pos => {
         const { latitude: lat, longitude: lng, speed, accuracy } = pos.coords;
@@ -146,7 +161,7 @@
       document.getElementById('btnStart').disabled = false;
       document.getElementById('btnStop').disabled = true;
       setStatus(`完了 - ${points.length}ポイント記録`);
-      fetch('tracking', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({active: false}) });
+      fetch('tracking', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({active: false, deviceId}) });
     }
 
     async function uploadPhoto(input) {
@@ -200,6 +215,7 @@
         formData.append('photo', file);
         formData.append('lat', lat);
         formData.append('lng', lng);
+        formData.append('deviceId', deviceId);
 
         const resp = await fetch('photo', { method: 'POST', body: formData });
         const data = await resp.json();
