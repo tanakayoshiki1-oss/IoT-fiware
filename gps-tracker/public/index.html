@@ -395,13 +395,14 @@
     let photoMarkers = [], otherMarkers = [], showAll = false;
     const photoMeta = new Map();
 
-    function addPhotoMarker(lat, lng, url, timestamp, rating, comments, isOwn) {
+    function addPhotoMarker(lat, lng, url, timestamp, rating, comments, photoDeviceId) {
       photoMeta.set(url, { rating: rating || 0, comments: comments || [] });
       const time = new Date(timestamp).toLocaleString('ja-JP');
+      const isOwn = photoDeviceId === deviceId;
       const icon = isOwn ? myPhotoIcon : otherPhotoIcon;
       const m = L.marker([lat, lng], { icon })
         .bindPopup(`
-          <div class="photo-popup" data-url="${url}" data-time="${escapeHtml(time)}" data-own="${isOwn}">
+          <div class="photo-popup" data-url="${url}" data-time="${escapeHtml(time)}" data-photo-device="${escapeHtml(photoDeviceId)}">
             <img src="${url}">
             <div class="rating-row">
               <div class="stars">${buildStars(rating || 0)}</div>
@@ -466,8 +467,8 @@
         };
       }
 
-      // 本人判定（fetch前に確定）
-      const isOwn = popup.dataset.own === 'true';
+      // 写真のdeviceIdとその時点のdeviceIdを比較（単一判定ロジック）
+      const isOwn = popup.dataset.photoDevice === deviceId;
       const starsEl = popup.querySelector('.stars');
       const saveBtn = popup.querySelector('.save-rating');
 
@@ -530,12 +531,12 @@
       closeChatPanel();
     });
 
-    function addMyPhotoMarker(lat, lng, url, ts, rating, comments) {
-      const m = addPhotoMarker(lat, lng, url, ts, rating, comments, true);
+    function addMyPhotoMarker(lat, lng, url, ts, rating, comments, photoDeviceId) {
+      const m = addPhotoMarker(lat, lng, url, ts, rating, comments, photoDeviceId || deviceId);
       if (m) photoMarkers.push(m);
     }
-    function addOtherPhotoMarker(lat, lng, url, ts, rating, comments) {
-      const m = addPhotoMarker(lat, lng, url, ts, rating, comments, false);
+    function addOtherPhotoMarker(lat, lng, url, ts, rating, comments, photoDeviceId) {
+      const m = addPhotoMarker(lat, lng, url, ts, rating, comments, photoDeviceId || 'unknown');
       if (m) { m.remove(); otherMarkers.push(m); }
     }
 
@@ -570,8 +571,8 @@
 
     fetch('photos-list').then(r => r.json()).then(list => {
       list.forEach(p => {
-        if (p.deviceId === deviceId) addMyPhotoMarker(p.lat, p.lng, p.url, p.timestamp, p.rating, p.comments);
-        else addOtherPhotoMarker(p.lat, p.lng, p.url, p.timestamp, p.rating, p.comments);
+        if (p.deviceId === deviceId) addMyPhotoMarker(p.lat, p.lng, p.url, p.timestamp, p.rating, p.comments, p.deviceId);
+        else addOtherPhotoMarker(p.lat, p.lng, p.url, p.timestamp, p.rating, p.comments, p.deviceId);
       });
       updatePhotoCount();
     }).catch(() => {});
@@ -700,7 +701,7 @@
         fd.append('photo', file); fd.append('lat', lat); fd.append('lng', lng); fd.append('deviceId', deviceId);
         const resp = await fetch('photo', { method:'POST', body:fd });
         const data = await resp.json();
-        addMyPhotoMarker(data.lat, data.lng, data.url, data.timestamp, 0, []);
+        addMyPhotoMarker(data.lat, data.lng, data.url, data.timestamp, 0, [], data.deviceId);
         map.setView([data.lat, data.lng]);
         setStatus(`写真を追加しました（${source}）`);
         updatePhotoCount();
