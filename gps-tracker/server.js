@@ -20,6 +20,29 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 let photosList = [];
 try { photosList = JSON.parse(fs.readFileSync(PHOTOS_DATA, 'utf8')); } catch (e) {}
 
+// 旧形式(comment文字列) → 新形式(comments配列)への自動移行
+let migrated = false;
+photosList = photosList.map(p => {
+  if (!Array.isArray(p.comments)) {
+    migrated = true;
+    const comments = [];
+    if (p.comment && String(p.comment).trim()) {
+      comments.push({
+        deviceId: p.deviceId || 'unknown',
+        text: String(p.comment).trim(),
+        timestamp: p.timestamp,
+      });
+    }
+    const { comment, ...rest } = p;
+    return { ...rest, comments };
+  }
+  return p;
+});
+if (migrated) {
+  fs.writeFileSync(PHOTOS_DATA, JSON.stringify(photosList));
+  console.log(`[migration] comment → comments 変換完了 (${photosList.length}件)`);
+}
+
 const storage = multer.diskStorage({
   destination: PHOTOS_DIR,
   filename: (req, file, cb) => cb(null, `photo_${Date.now()}.jpg`),
@@ -124,6 +147,8 @@ app.post('/photo', (req, res) => {
       lng: parseFloat(lng),
       timestamp: new Date().toISOString(),
       deviceId: deviceId || 'unknown',
+      rating: 0,
+      comments: [],
     };
     photosList.push(entry);
     fs.writeFileSync(PHOTOS_DATA, JSON.stringify(photosList));
@@ -137,13 +162,36 @@ app.get('/photos-list', (req, res) => {
   res.json(deviceId ? photosList.filter(p => p.deviceId === deviceId) : photosList);
 });
 
+app.get('/photo-detail', (req, res) => {
+  const { url } = req.query;
+  const photo = photosList.find(p => p.url === url);
+  if (!photo) return res.status(404).json({ error: 'not found' });
+  res.json(photo);
+});
+
 app.patch('/photo-meta', (req, res) => {
-  const { url, rating, comment } = req.body;
+  const { url, rating } = req.body;
   const idx = photosList.findIndex(p => p.url === url);
   if (idx === -1) return res.status(404).json({ error: 'not found' });
-  photosList[idx] = { ...photosList[idx], rating, comment };
+  photosList[idx].rating = rating;
   fs.writeFileSync(PHOTOS_DATA, JSON.stringify(photosList));
   res.json(photosList[idx]);
+});
+
+app.post('/photo-comment', (req, res) => {
+  const { url, deviceId, text } = req.body;
+  if (!text || !String(text).trim()) return res.status(400).json({ error: 'text required' });
+  const idx = photosList.findIndex(p => p.url === url);
+  if (idx === -1) return res.status(404).json({ error: 'not found' });
+  if (!Array.isArray(photosList[idx].comments)) photosList[idx].comments = [];
+  const entry = {
+    deviceId: deviceId || 'unknown',
+    text: String(text).trim(),
+    timestamp: new Date().toISOString(),
+  };
+  photosList[idx].comments.push(entry);
+  fs.writeFileSync(PHOTOS_DATA, JSON.stringify(photosList));
+  res.json(entry);
 });
 
 app.listen(PORT, () => {
