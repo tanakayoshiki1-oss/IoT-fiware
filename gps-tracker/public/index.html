@@ -455,6 +455,15 @@
         };
       }
 
+      // fetchより前に本人判定してUIを即時制御（fetch中にボタンが見えないよう）
+      const isOwn = popup.dataset.own === 'true';
+      const starsEl = popup.querySelector('.stars');
+      const saveBtn = popup.querySelector('.save-rating');
+      if (!isOwn) {
+        if (saveBtn) saveBtn.style.display = 'none';
+        if (starsEl) starsEl.style.cursor = 'default';
+      }
+
       // コメントボタンを表示（チャットパネルが閉じているときのみ）
       if (document.getElementById('chat-panel').style.display !== 'block') {
         document.getElementById('float-comment-btn').style.display = 'block';
@@ -474,9 +483,6 @@
       // popup が既に閉じていたら中断
       if (!currentPopupUrl) return;
 
-      const starsEl = popup.querySelector('.stars');
-      const saveBtn = popup.querySelector('.save-rating');
-      const isOwn = popup.dataset.own === 'true';
       if (starsEl) {
         starsEl.innerHTML = buildStars(currentRating);
         if (isOwn) {
@@ -486,13 +492,10 @@
             currentRating = parseInt(star.dataset.val);
             starsEl.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('filled', i < currentRating));
           };
-        } else {
-          starsEl.style.cursor = 'default';
         }
       }
-      if (saveBtn) {
-        if (!isOwn) { saveBtn.style.display = 'none'; }
-        else saveBtn.onclick = function() {
+      if (saveBtn && isOwn) {
+        saveBtn.onclick = function() {
           fetch('photo-meta', {
             method: 'PATCH',
             headers: {'Content-Type':'application/json'},
