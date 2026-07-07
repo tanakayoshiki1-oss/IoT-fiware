@@ -11,6 +11,7 @@
     #header { background: #2c3e50; color: white; padding: 12px 16px; }
     #header h1 { font-size: 18px; }
     #status { font-size: 12px; margin-top: 4px; opacity: 0.8; }
+    #photo-count { font-size: 11px; margin-top: 2px; opacity: 0.7; }
     #controls { display: flex; gap: 8px; padding: 12px 16px; background: white; border-bottom: 1px solid #ddd; }
     button { flex: 1; padding: 14px 4px; border: none; border-radius: 8px; font-size: clamp(13px, 4vw, 16px); font-weight: bold; cursor: pointer; white-space: nowrap; }
     #btnStart { background: #27ae60; color: white; }
@@ -30,11 +31,13 @@
   <div id="header">
     <h1>📍 GPSルートトラッカー</h1>
     <div id="status">待機中</div>
+    <div id="photo-count"></div>
   </div>
   <div id="controls">
     <button id="btnStart" onclick="startTracking()">▶ スタート</button>
     <button id="btnStop"  onclick="stopTracking()" disabled>■ エンド</button>
     <button id="btnPhoto" onclick="document.getElementById('photoInput').click()">📷 写真</button>
+    <button id="btnAllPhotos" onclick="showAllPhotos()" style="background:#8e44ad;color:white;">🗺 全表示</button>
   </div>
   <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="uploadPhoto(this)">
   <div id="map"></div>
@@ -87,20 +90,38 @@
 
     function addPhotoMarker(lat, lng, url, timestamp) {
       const time = new Date(timestamp).toLocaleString('ja-JP');
-      L.marker([lat, lng], { icon: photoIcon })
+      const m = L.marker([lat, lng], { icon: photoIcon })
         .bindPopup(`<div class="photo-popup"><img src="${url}"><small>${time}</small></div>`)
         .addTo(map);
+      return m;
     }
 
-    // 起動時: 前回位置に地図を移動 + このデバイスの写真を読み込む
+    let photoMarkers = [];
+
+    function addPhotoMarkerTracked(lat, lng, url, timestamp) {
+      const m = addPhotoMarker(lat, lng, url, timestamp);
+      if (m) photoMarkers.push(m);
+    }
+
+    function showAllPhotos() {
+      if (photoMarkers.length === 0) return;
+      const bounds = L.latLngBounds(photoMarkers.map(m => m.getLatLng()));
+      map.fitBounds(bounds, { padding: [40, 40] });
+    }
+
+    // 起動時: 前回位置に移動 + 写真マーカーを読み込む
     fetch(`last-position?deviceId=${encodeURIComponent(deviceId)}`)
       .then(r => r.json())
-      .then(pos => { if (pos) map.setView([pos.lat, pos.lng], 15); })
+      .then(pos => { if (pos) map.setView([pos.lat, pos.lng], 13); })
       .catch(() => {});
 
     fetch(`photos-list?deviceId=${encodeURIComponent(deviceId)}`)
       .then(r => r.json())
-      .then(list => list.forEach(p => addPhotoMarker(p.lat, p.lng, p.url, p.timestamp)))
+      .then(list => {
+        list.forEach(p => addPhotoMarkerTracked(p.lat, p.lng, p.url, p.timestamp));
+        document.getElementById('photo-count').textContent =
+          `📷 ${list.length}件の写真`;
+      })
       .catch(() => {});
 
     async function sendLocation(lat, lng, speed, accuracy) {
@@ -220,7 +241,7 @@
         const resp = await fetch('photo', { method: 'POST', body: formData });
         const data = await resp.json();
 
-        addPhotoMarker(data.lat, data.lng, data.url, data.timestamp);
+        addPhotoMarkerTracked(data.lat, data.lng, data.url, data.timestamp);
         map.setView([data.lat, data.lng]);
         setStatus(`写真を追加しました（${source}）`);
       } catch (e) {
