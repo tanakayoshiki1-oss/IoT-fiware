@@ -134,8 +134,16 @@
   <script src="https://unpkg.com/exifr/dist/lite.umd.js"></script>
   <script>
     function getDeviceId() {
+      // localStorage → クッキーの順に読み込み（キャッシュクリアでlocalStorageが消えてもクッキーで復元）
       let id = localStorage.getItem('gps_device_id');
-      if (!id) { id = crypto.randomUUID(); localStorage.setItem('gps_device_id', id); }
+      if (!id) {
+        const m = document.cookie.match(/(?:^|;\s*)gps_device_id=([^;]+)/);
+        if (m) id = m[1];
+      }
+      if (!id) id = crypto.randomUUID();
+      localStorage.setItem('gps_device_id', id);
+      const exp = new Date(Date.now() + 365 * 24 * 3600 * 1000).toUTCString();
+      document.cookie = `gps_device_id=${id}; expires=${exp}; path=/; SameSite=Lax`;
       return id;
     }
     const deviceId = getDeviceId();
