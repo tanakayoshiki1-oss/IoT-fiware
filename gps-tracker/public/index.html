@@ -466,13 +466,43 @@
         };
       }
 
-      // fetchより前に本人判定してUIを即時制御（fetch中にボタンが見えないよう）
+      // 本人判定（fetch前に確定）
       const isOwn = popup.dataset.own === 'true';
       const starsEl = popup.querySelector('.stars');
       const saveBtn = popup.querySelector('.save-rating');
+
+      // キャッシュ値で即時表示・onclick を fetch 前にセット
+      let currentRating = (photoMeta.get(currentPopupUrl) || {}).rating || 0;
+      let userInteracted = false;
+
       if (!isOwn) {
         if (saveBtn) saveBtn.style.display = 'none';
         if (starsEl) starsEl.style.cursor = 'default';
+      } else {
+        if (starsEl) {
+          starsEl.innerHTML = buildStars(currentRating);
+          starsEl.onclick = function(ev) {
+            const star = ev.target.closest('.star');
+            if (!star) return;
+            userInteracted = true;
+            currentRating = parseInt(star.dataset.val);
+            starsEl.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('filled', i < currentRating));
+          };
+        }
+        if (saveBtn) {
+          saveBtn.onclick = function() {
+            fetch('photo-meta', {
+              method: 'PATCH',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ url: currentPopupUrl, rating: currentRating, deviceId }),
+            }).then(r => r.json()).then(() => {
+              const cached = photoMeta.get(currentPopupUrl) || {};
+              photoMeta.set(currentPopupUrl, { ...cached, rating: currentRating });
+              saveBtn.textContent = '✓保存';
+              setTimeout(() => { saveBtn.textContent = '★保存'; }, 2000);
+            }).catch(() => { saveBtn.textContent = 'エラー'; });
+          };
+        }
       }
 
       // コメントボタンを表示（チャットパネルが閉じているときのみ）
@@ -480,45 +510,16 @@
         document.getElementById('float-comment-btn').style.display = 'block';
       }
 
-      // 評価をサーバーから取得して星を更新
-      let photo;
+      // サーバーから最新評価を取得して未操作なら表示を更新
       try {
         const r = await fetch(`photo-detail?url=${encodeURIComponent(currentPopupUrl)}`);
-        photo = await r.json();
+        const photo = await r.json();
         photoMeta.set(currentPopupUrl, { rating: photo.rating || 0, comments: photo.comments || [] });
-      } catch (_) {
-        photo = photoMeta.get(currentPopupUrl) || { rating: 0, comments: [] };
-      }
-      let currentRating = photo.rating || 0;
-
-      // popup が既に閉じていたら中断
-      if (!currentPopupUrl) return;
-
-      if (starsEl) {
-        starsEl.innerHTML = buildStars(currentRating);
-        if (isOwn) {
-          starsEl.onclick = function(ev) {
-            const star = ev.target.closest('.star');
-            if (!star) return;
-            currentRating = parseInt(star.dataset.val);
-            starsEl.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('filled', i < currentRating));
-          };
+        if (!userInteracted && currentPopupUrl) {
+          currentRating = photo.rating || 0;
+          if (starsEl) starsEl.innerHTML = buildStars(currentRating);
         }
-      }
-      if (saveBtn && isOwn) {
-        saveBtn.onclick = function() {
-          fetch('photo-meta', {
-            method: 'PATCH',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ url: currentPopupUrl, rating: currentRating, deviceId }),
-          }).then(r => r.json()).then(() => {
-            const cached = photoMeta.get(currentPopupUrl) || {};
-            photoMeta.set(currentPopupUrl, { ...cached, rating: currentRating });
-            saveBtn.textContent = '✓保存';
-            setTimeout(() => { saveBtn.textContent = '★保存'; }, 2000);
-          }).catch(() => { saveBtn.textContent = 'エラー'; });
-        };
-      }
+      } catch (_) {}
     });
 
     map.on('popupclose', function() {
