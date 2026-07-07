@@ -195,6 +195,12 @@ app.post('/photo-comment', (req, res) => {
   res.json(entry);
 });
 
+app.get('/device-ids', (req, res) => {
+  const map = {};
+  photosList.forEach(p => { map[p.deviceId] = (map[p.deviceId] || 0) + 1; });
+  res.json(Object.entries(map).map(([deviceId, count]) => ({ deviceId, count })));
+});
+
 // 旧deviceId → 新deviceId への一括変更（本人確認なし・個人用途のみ）
 app.post('/rename-device', (req, res) => {
   const { oldId, newId } = req.body;

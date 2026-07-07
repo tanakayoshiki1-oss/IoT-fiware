@@ -245,15 +245,25 @@
           location.reload();
         }
       } else if (action === '2') {
-        const oldId = (prompt('旧デバイスID（UUIDなど）を入力してください') || '').trim();
-        if (!oldId) return;
-        fetch('rename-device', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ oldId, newId: deviceId }),
-        }).then(r => r.json()).then(d => {
-          alert(`${d.updated}件の写真を引き継ぎました。再読み込みします。`);
-          location.reload();
+        fetch('device-ids').then(r => r.json()).then(list => {
+          const others = list.filter(d => d.deviceId !== deviceId);
+          if (others.length === 0) { alert('引き継ぐ写真が見つかりません'); return; }
+          let msg = '引き継ぐIDを番号で選択してください:\n\n';
+          others.forEach((d, i) => {
+            msg += `${i + 1}  ${d.deviceId.slice(0, 16)}... (${d.count}件)\n`;
+          });
+          msg += '\n（番号を入力、空欄でキャンセル）';
+          const sel = (prompt(msg) || '').trim();
+          const idx = parseInt(sel, 10) - 1;
+          if (isNaN(idx) || idx < 0 || idx >= others.length) return;
+          fetch('rename-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ oldId: others[idx].deviceId, newId: deviceId }),
+          }).then(r => r.json()).then(d => {
+            alert(`${d.updated}件の写真を引き継ぎました。再読み込みします。`);
+            location.reload();
+          });
         });
       }
     }
