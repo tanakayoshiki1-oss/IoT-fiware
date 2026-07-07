@@ -111,7 +111,7 @@
     </div>
     <div id="chat-panel-messages"></div>
     <div id="chat-panel-input-row">
-      <textarea id="chat-panel-input" rows="1" placeholder="コメントを入力..."></textarea>
+      <textarea id="chat-panel-input" rows="1" placeholder="コメントを入力..." tabindex="0"></textarea>
       <button id="chat-panel-send" onclick="sendPanelComment()">送信</button>
     </div>
   </div>
@@ -186,6 +186,10 @@
       document.getElementById('chat-panel-title').textContent = `💬 コメント（${time}）`;
       document.getElementById('chat-panel').style.display = 'block';
       await refreshPanelComments();
+      // PC（マウスあり）のみ自動フォーカス。スマホは仮想キーボードが勝手に開かないよう除外
+      if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        setTimeout(() => document.getElementById('chat-panel-input').focus(), 50);
+      }
     }
 
     function closeChatPanel() {
