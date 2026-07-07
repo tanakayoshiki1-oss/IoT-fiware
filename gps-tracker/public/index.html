@@ -278,6 +278,7 @@
     let marker = null;
     let points = [];
     let startFlagMarker = null, endFlagMarker = null;
+    let trackingStartTime = null;
 
     const startFlagIcon = L.divIcon({
       html: '<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:22px;line-height:1;">🚩</div>',
@@ -574,6 +575,32 @@
       updatePhotoCount();
     }).catch(() => {});
 
+    function drawSavedRoute(route, isOwn) {
+      const pts = route.points;
+      if (!pts || pts.length === 0) return;
+      const color = isOwn ? '#e74c3c' : '#3498db';
+      const label = route.authorName || (isOwn ? deviceName : route.deviceId.slice(0, 8));
+      const startT = route.startTime ? new Date(route.startTime).toLocaleString('ja-JP') : '';
+      const endT   = route.endTime   ? new Date(route.endTime).toLocaleString('ja-JP')   : '';
+      if (pts.length >= 2) {
+        L.polyline(pts, { color, weight: 3, opacity: 0.75 })
+          .bindPopup(`<b>${isOwn ? 'あなた' : escapeHtml(label)}</b><br>${startT} 〜 ${endT}<br>${pts.length} ポイント`)
+          .addTo(map);
+      }
+      L.marker(pts[0], { icon: startFlagIcon, zIndexOffset: 90 })
+        .bindPopup(`🚩 スタート<br>${escapeHtml(label)}<br>${startT}`)
+        .addTo(map);
+      if (pts.length > 1) {
+        L.marker(pts[pts.length - 1], { icon: endFlagIcon, zIndexOffset: 90 })
+          .bindPopup(`🏁 ゴール<br>${escapeHtml(label)}<br>${endT}`)
+          .addTo(map);
+      }
+    }
+
+    fetch('routes-list').then(r => r.json()).then(list => {
+      list.forEach(r => drawSavedRoute(r, r.deviceId === deviceId));
+    }).catch(() => {});
+
     async function sendLocation(lat, lng, speed, accuracy) {
       try {
         await fetch('location', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -584,6 +611,7 @@
     function startTracking() {
       if (!navigator.geolocation) { alert('このブラウザはGeolocationに対応していません'); return; }
       points = []; polyline.setLatLngs([]);
+      trackingStartTime = new Date().toISOString();
       if (startFlagMarker) { startFlagMarker.remove(); startFlagMarker = null; }
       if (endFlagMarker)   { endFlagMarker.remove();   endFlagMarker = null; }
       document.getElementById('btnStart').disabled = true;
@@ -622,11 +650,30 @@
       document.getElementById('btnStart').disabled = false;
       document.getElementById('btnStop').disabled = true;
       setStatus(`完了 - ${points.length}ポイント記録`);
-      if (points.length > 0) {
-        const last = points[points.length - 1];
-        endFlagMarker = L.marker(last, { icon: endFlagIcon, zIndexOffset: 100 }).addTo(map);
-      }
       fetch('tracking', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active:false, deviceId}) });
+      if (points.length >= 1) {
+        fetch('route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deviceId, authorName: deviceName, points,
+            startTime: trackingStartTime, endTime: new Date().toISOString(),
+          }),
+        }).then(r => r.json()).then(saved => {
+          // ライブ表示をクリアして保存済みスタイルで再描画
+          if (startFlagMarker) { startFlagMarker.remove(); startFlagMarker = null; }
+          if (endFlagMarker)   { endFlagMarker.remove();   endFlagMarker = null; }
+          if (marker)          { marker.remove();           marker = null; }
+          polyline.setLatLngs([]);
+          drawSavedRoute(saved, true);
+          setStatus(`保存完了 - ${points.length}ポイント`);
+        }).catch(() => {
+          // 保存失敗時はライブ表示のまま
+          if (points.length > 0) {
+            endFlagMarker = L.marker(points[points.length - 1], { icon: endFlagIcon, zIndexOffset: 100 }).addTo(map);
+          }
+        });
+      }
     }
 
     async function uploadPhoto(input) {

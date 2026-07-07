@@ -20,6 +20,10 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 let photosList = [];
 try { photosList = JSON.parse(fs.readFileSync(PHOTOS_DATA, 'utf8')); } catch (e) {}
 
+const ROUTES_DATA = path.join(DATA_DIR, 'routes-data.json');
+let routesList = [];
+try { routesList = JSON.parse(fs.readFileSync(ROUTES_DATA, 'utf8')); } catch (e) {}
+
 // 旧形式(comment文字列) → 新形式(comments配列)への自動移行
 let migrated = false;
 photosList = photosList.map(p => {
@@ -193,6 +197,27 @@ app.post('/photo-comment', (req, res) => {
   };
   photosList[idx].comments.push(entry);
   fs.writeFileSync(PHOTOS_DATA, JSON.stringify(photosList));
+  res.json(entry);
+});
+
+app.get('/routes-list', (req, res) => {
+  res.json(routesList);
+});
+
+app.post('/route', (req, res) => {
+  const { deviceId, authorName, points, startTime, endTime } = req.body;
+  if (!points || points.length < 1) return res.status(400).json({ error: 'points required' });
+  const entry = {
+    id: `route_${Date.now()}`,
+    deviceId: deviceId || 'unknown',
+    authorName: authorName ? String(authorName).trim().slice(0, 20) : null,
+    points,
+    startTime: startTime || new Date().toISOString(),
+    endTime: endTime || new Date().toISOString(),
+  };
+  routesList.push(entry);
+  fs.writeFileSync(ROUTES_DATA, JSON.stringify(routesList));
+  console.log(`[${new Date().toLocaleString('ja-JP')}] ルート保存: ${entry.id} ${points.length}pts (${authorName || deviceId})`);
   res.json(entry);
 });
 
