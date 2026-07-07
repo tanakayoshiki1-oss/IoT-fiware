@@ -280,12 +280,12 @@
     let startFlagMarker = null, endFlagMarker = null;
 
     const startFlagIcon = L.divIcon({
-      html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4))">🚩</div>',
-      className: '', iconSize: [26, 26], iconAnchor: [3, 26],
+      html: '<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:22px;line-height:1;">🚩</div>',
+      className: '', iconSize: [28, 28], iconAnchor: [3, 27],
     });
     const endFlagIcon = L.divIcon({
-      html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4))">🏁</div>',
-      className: '', iconSize: [26, 26], iconAnchor: [3, 26],
+      html: '<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:22px;line-height:1;">🏁</div>',
+      className: '', iconSize: [28, 28], iconAnchor: [14, 27],
     });
     const INTERVAL_MS = 5000;
     let lastSent = 0;
@@ -590,12 +590,21 @@
       document.getElementById('btnStop').disabled = false;
       setStatus('トラッキング中...');
       fetch('tracking', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active:true, deviceId}) });
+      // getCurrentPosition でスタート旗を即時配置（PC等 watchPosition が遅い環境の補完）
+      navigator.geolocation.getCurrentPosition(pos => {
+        if (!startFlagMarker) {
+          const { latitude: lat, longitude: lng } = pos.coords;
+          map.setView([lat, lng]);
+          startFlagMarker = L.marker([lat, lng], { icon: startFlagIcon, zIndexOffset: 100 }).addTo(map);
+        }
+      }, null, { enableHighAccuracy: false, maximumAge: 30000 });
       watchId = navigator.geolocation.watchPosition(pos => {
         const { latitude:lat, longitude:lng, speed, accuracy } = pos.coords;
         const now = Date.now();
         currentLat = lat; currentLng = lng;
         points.push([lat, lng]); polyline.setLatLngs(points); map.setView([lat, lng]);
-        if (points.length === 1) {
+        if (points.length === 1 && !startFlagMarker) {
+          // getCurrentPosition が失敗した場合のフォールバック
           startFlagMarker = L.marker([lat, lng], { icon: startFlagIcon, zIndexOffset: 100 }).addTo(map);
         }
         if (marker) marker.setLatLng([lat, lng]);
