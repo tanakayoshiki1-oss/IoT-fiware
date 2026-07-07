@@ -39,8 +39,8 @@
             border-radius: 20px; font-size: 13px; z-index: 1000; display: none; }
 
     /* 写真ポップアップ */
-    .photo-popup { min-width: 220px; }
-    .photo-popup img { max-width: 220px; max-height: 160px; display: block; border-radius: 6px; }
+    .photo-popup { min-width: 220px; max-height: min(420px, calc(100vh - 210px)); overflow-y: auto; overscroll-behavior: contain; }
+    .photo-popup img { max-width: 220px; max-height: 120px; display: block; border-radius: 6px; }
     .photo-popup small { display: block; margin-top: 4px; color: #666; font-size: 11px; }
 
     /* 評価行 */
@@ -104,13 +104,15 @@
     }
     const deviceId = getDeviceId();
 
-    // Leaflet の mousedown 横取りより先にキャプチャして chat-input にフォーカスを与える
-    document.addEventListener('mousedown', function(e) {
-      if (e.target.classList.contains('chat-input')) {
-        e.stopImmediatePropagation();
-        e.target.focus();
-      }
-    }, { capture: true });
+    // Leaflet の mousedown/click 横取りより先にキャプチャして chat-input にフォーカスを与える
+    ['mousedown', 'click'].forEach(function(evtName) {
+      document.addEventListener(evtName, function(e) {
+        if (e.target.classList.contains('chat-input')) {
+          e.stopImmediatePropagation();
+          if (evtName === 'mousedown') e.target.focus();
+        }
+      }, true); // true = capture phase（旧ブラウザ互換）
+    });
 
     const map = L.map('map').setView([43.0646, 141.3468], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -205,7 +207,9 @@
             </div>
             <div class="chat-area"></div>
             <div class="chat-input-row">
-              <textarea class="chat-input" rows="1" placeholder="コメントを入力..."></textarea>
+              <textarea class="chat-input" rows="1" placeholder="コメントを入力..."
+                onmousedown="event.stopImmediatePropagation();this.focus();"
+                onclick="event.stopPropagation();"></textarea>
               <button class="chat-send">送信</button>
             </div>
             <small>${time}</small>
