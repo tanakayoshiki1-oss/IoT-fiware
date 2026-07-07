@@ -133,28 +133,63 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/exifr/dist/lite.umd.js"></script>
   <script>
-    function saveDeviceId(id) {
-      localStorage.setItem('gps_device_id', id);
+    function fnv1a(str) {
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619) >>> 0;
+      }
+      return h.toString(16).padStart(8, '0');
+    }
+    function computeDeviceId(name, pin) { return fnv1a(name + ':' + pin); }
+
+    function saveDevice(id, name, pin) {
+      localStorage.setItem('gps_device_id',   id);
+      localStorage.setItem('gps_device_name', name);
+      localStorage.setItem('gps_device_pin',  pin);
       const exp = new Date(Date.now() + 365 * 24 * 3600 * 1000).toUTCString();
-      document.cookie = `gps_device_id=${id}; expires=${exp}; path=/; SameSite=Lax`;
+      const opts = `; expires=${exp}; path=/; SameSite=Lax`;
+      document.cookie = `gps_device_id=${encodeURIComponent(id)}${opts}`;
+      document.cookie = `gps_device_name=${encodeURIComponent(name)}${opts}`;
+      document.cookie = `gps_device_pin=${encodeURIComponent(pin)}${opts}`;
     }
 
+    let deviceName = null;
+
     function getDeviceId() {
-      // localStorage → クッキーの順に読み込み
-      let id = localStorage.getItem('gps_device_id');
+      let id   = localStorage.getItem('gps_device_id');
+      let name = localStorage.getItem('gps_device_name');
+      let pin  = localStorage.getItem('gps_device_pin');
       if (!id) {
-        const m = document.cookie.match(/(?:^|;\s*)gps_device_id=([^;]+)/);
-        if (m) id = decodeURIComponent(m[1]);
+        const mId   = document.cookie.match(/(?:^|;\s*)gps_device_id=([^;]+)/);
+        const mName = document.cookie.match(/(?:^|;\s*)gps_device_name=([^;]+)/);
+        const mPin  = document.cookie.match(/(?:^|;\s*)gps_device_pin=([^;]+)/);
+        if (mId)   id   = decodeURIComponent(mId[1]);
+        if (mName) name = decodeURIComponent(mName[1]);
+        if (mPin)  pin  = decodeURIComponent(mPin[1]);
       }
       if (!id) {
-        // 初回: ユーザー名を入力させる（UUIDではなく覚えられる名前）
-        let name = '';
-        while (!name) {
-          name = (prompt('このデバイスの名前を入力してください\n（例: tanaka, iphone-yoshiki）\n\nキャッシュクリアしても同じ名前を入力すれば写真が自分のものとして表示されます。') || '').trim();
+        let n = '';
+        while (!n) {
+          n = (prompt(
+            'このデバイスの名前を入力してください\n（例: tanaka, iphone-yoshiki）\n\n' +
+            'キャッシュクリアしても同じ名前+PINを入力すれば写真が自分のものとして表示されます。'
+          ) || '').trim();
         }
-        id = name;
+        let p = '';
+        while (!p) {
+          const entered = (prompt(
+            '4桁のPINを設定してください\n（例: 1234）\n\n' +
+            '他の人が同じ名前を使えないようにするためのパスワードです。'
+          ) || '').trim();
+          if (/^\d{4}$/.test(entered)) p = entered;
+          else if (entered) alert('4桁の数字を入力してください');
+        }
+        id = computeDeviceId(n, p);
+        name = n; pin = p;
+        saveDevice(id, name, pin);
       }
-      saveDeviceId(id);
+      deviceName = name || id.slice(0, 8);
       return id;
     }
     let deviceId = getDeviceId();
@@ -169,28 +204,57 @@
     })();
 
     function showDeviceIdDialog() {
-      const current = deviceId;
-      const input = prompt(
-        `現在のデバイス名: ${current}\n\n変更する場合は新しい名前を入力（空欄でキャンセル）`,
-        current
+      const enteredPin = (prompt(`デバイス名: ${deviceName}\n\nPINを入力して確認してください`) || '').trim();
+      if (!enteredPin) return;
+      const storedPin = localStorage.getItem('gps_device_pin') || '';
+      const valid = (storedPin && enteredPin === storedPin) ||
+                    computeDeviceId(deviceName, enteredPin) === deviceId;
+      if (!valid) { alert('PINが違います'); return; }
+
+      const action = prompt(
+        '認証OK ✓\n\n操作を選択してください:\n' +
+        '1 → 名前/PINを変更\n' +
+        '2 → 旧IDから写真を引き継ぐ\n' +
+        '（空欄でキャンセル）'
       );
-      if (!input || !input.trim() || input.trim() === current) return;
-      const newId = input.trim();
-      const migrate = confirm(`このデバイスで登録した既存の写真を\n「${newId}」に引き継ぎますか？`);
-      if (migrate) {
+
+      if (action === '1') {
+        const newName = (prompt('新しいデバイス名（空欄で現在のまま）', deviceName) || '').trim() || deviceName;
+        let newPin = enteredPin;
+        const pc = (prompt('新しいPIN（4桁、空欄で現在のまま）') || '').trim();
+        if (pc) {
+          if (!/^\d{4}$/.test(pc)) { alert('4桁の数字を入力してください'); return; }
+          newPin = pc;
+        }
+        const newId = computeDeviceId(newName, newPin);
+        if (newId === deviceId) { alert('変更はありません'); return; }
+        const migrate = confirm('登録済みの写真を新しい設定に引き継ぎますか？');
+        if (migrate) {
+          fetch('rename-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ oldId: deviceId, newId }),
+          }).then(r => r.json()).then(d => {
+            saveDevice(newId, newName, newPin);
+            alert(`${d.updated}件引き継ぎました。再読み込みします。`);
+            location.reload();
+          });
+        } else {
+          saveDevice(newId, newName, newPin);
+          alert('設定を変更しました。再読み込みします。');
+          location.reload();
+        }
+      } else if (action === '2') {
+        const oldId = (prompt('旧デバイスID（UUIDなど）を入力してください') || '').trim();
+        if (!oldId) return;
         fetch('rename-device', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ oldId: current, newId }),
+          body: JSON.stringify({ oldId, newId: deviceId }),
         }).then(r => r.json()).then(d => {
-          saveDeviceId(newId);
-          alert(`${d.updated}件の写真を引き継ぎました。ページを再読み込みします。`);
+          alert(`${d.updated}件の写真を引き継ぎました。再読み込みします。`);
           location.reload();
         });
-      } else {
-        saveDeviceId(newId);
-        alert(`デバイス名を「${newId}」に変更しました。ページを再読み込みします。`);
-        location.reload();
       }
     }
 
@@ -239,7 +303,7 @@
       el.innerHTML = comments.map(c => {
         const isMe = c.deviceId === deviceId;
         const time = new Date(c.timestamp).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
-        const author = isMe ? 'あなた' : c.deviceId.slice(0, 6);
+        const author = isMe ? 'あなた' : (c.authorName || c.deviceId.slice(0, 8));
         return `<div class="chat-msg ${isMe?'mine':'other'}">
           ${!isMe ? `<div class="chat-author">${escapeHtml(author)}</div>` : ''}
           <div class="chat-bubble">${escapeHtml(c.text)}</div>
@@ -294,7 +358,7 @@
         await fetch('photo-comment', {
           method: 'POST',
           headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ url: currentPhotoUrl, deviceId, text }),
+          body: JSON.stringify({ url: currentPhotoUrl, deviceId, authorName: deviceName, text }),
         });
         await refreshPanelComments();
       } catch (_) {}

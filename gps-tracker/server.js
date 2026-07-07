@@ -179,13 +179,14 @@ app.patch('/photo-meta', (req, res) => {
 });
 
 app.post('/photo-comment', (req, res) => {
-  const { url, deviceId, text } = req.body;
+  const { url, deviceId, authorName, text } = req.body;
   if (!text || !String(text).trim()) return res.status(400).json({ error: 'text required' });
   const idx = photosList.findIndex(p => p.url === url);
   if (idx === -1) return res.status(404).json({ error: 'not found' });
   if (!Array.isArray(photosList[idx].comments)) photosList[idx].comments = [];
   const entry = {
     deviceId: deviceId || 'unknown',
+    authorName: authorName ? String(authorName).trim().slice(0, 20) : null,
     text: String(text).trim(),
     timestamp: new Date().toISOString(),
   };
