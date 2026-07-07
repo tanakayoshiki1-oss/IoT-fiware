@@ -271,6 +271,21 @@
       // チャットパネルを自動で開く
       openChatPanel(url, time);
 
+      // チャットパネルとヘッダーを考慮してポップアップが隠れないよう自動パン
+      setTimeout(() => {
+        const pEl = e.popup.getElement();
+        const chatPanel = document.getElementById('chat-panel');
+        if (!pEl || !chatPanel) return;
+        const popupRect = pEl.getBoundingClientRect();
+        const panelTop  = chatPanel.getBoundingClientRect().top;
+        const topBar    = document.getElementById('header').offsetHeight
+                        + document.getElementById('controls').offsetHeight;
+        let dy = 0;
+        if (popupRect.bottom > panelTop - 8)  dy = popupRect.bottom - panelTop + 16;
+        if (popupRect.top    < topBar   + 8)  dy = -(topBar + 12 - popupRect.top);
+        if (dy !== 0) map.panBy([0, dy], { animate: true, duration: 0.25 });
+      }, 320);
+
       // サーバーから最新の評価を取得
       let photo;
       try {
