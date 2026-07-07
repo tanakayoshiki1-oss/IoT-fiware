@@ -169,6 +169,34 @@ LINE アプリ（!写真）
 - fiware-servicepath: `/routes`
 - PostgreSQL テーブル: `gpsroute.routes`
 
+### 写真データ（ローカル JSON）
+
+FIWARE Orion には保存せず、Docker Volume 内の JSON ファイルで管理。
+
+ファイル: `/app/data/photos-data.json`（Volume: `iot_fiware_gps_data`）
+
+```json
+[
+  {
+    "url": "photos/photo_1234567890.jpg",
+    "lat": 43.0646,
+    "lng": 141.3468,
+    "deviceId": "uuid-v4",
+    "timestamp": "2026-07-07T09:59:34.000Z",
+    "rating": 4,
+    "comments": [
+      {
+        "deviceId": "uuid-v4",
+        "text": "コメント本文",
+        "timestamp": "2026-07-07T10:00:00.000Z"
+      }
+    ]
+  }
+]
+```
+
+写真ファイル: `/app/public/photos/`（Volume: `iot_fiware_gps_photos`）
+
 ---
 
 ## API 仕様
@@ -194,8 +222,14 @@ LINE アプリ（!写真）
 | メソッド | パス | 内容 |
 |----------|------|------|
 | GET | `/` | GPS トラッキング UI（Leaflet マップ） |
-| POST | `/location` | 位置情報受信 `{lat, lng, speed, accuracy}` |
-| POST | `/tracking` | トラッキング開始/停止 `{active: bool}` |
+| POST | `/location` | 位置情報受信 `{lat, lng, speed, accuracy, deviceId}` |
+| POST | `/tracking` | トラッキング開始/停止 `{active: bool, deviceId}` |
+| GET | `/last-position?deviceId=` | 最終位置取得（Orion から） |
+| POST | `/photo` | 写真アップロード（multipart/form-data: photo, lat, lng, deviceId） |
+| GET | `/photos-list?deviceId=` | 写真一覧（deviceId 省略で全件） |
+| GET | `/photo-detail?url=` | 写真詳細（評価・コメント含む） |
+| PATCH | `/photo-meta` | 星評価更新 `{url, rating}` |
+| POST | `/photo-comment` | コメント追加 `{url, deviceId, text}` |
 
 ---
 
@@ -228,6 +262,9 @@ LINE アプリ（!写真）
 | Orion → PostgreSQL パイプライン | ✅ 完了 | Draco サブスクリプション済み |
 | Grafana GPS ルートマップ | ✅ 完了 | markers 表示 |
 | Cloudflare Tunnel（固定ドメイン） | ✅ 完了 | codinghiker.com / Windows サービス |
+| 写真アップロード・地図表示 | ✅ 完了 | 位置情報付き、自分/他者色分け、表示切替 |
+| 写真コメント（チャット形式） | ✅ 完了 | デバイス間共有、ポップアップ外ボタンで開閉 |
+| 写真星評価 | ✅ 完了 | 1〜5 星、デバイス間共有 |
 | 画像 AI 解析（LLM） | 〇 予定 | Mac mini 到着後 |
 | スマートホーム制御（Tuya） | 〇 予定 | |
 | PiCar-X 移動制御 | 〇 予定 | |

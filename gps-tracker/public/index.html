@@ -36,7 +36,18 @@
     .star { color: #ccc; transition: color 0.1s; }
     .star.filled { color: #f39c12; }
     .save-rating { background: #3498db; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; }
-    .open-chat-btn { width: 100%; margin-top: 4px; background: #2980b9; color: white; border: none; padding: 6px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    /* コメントボタン（ポップアップ外・固定位置） */
+    #float-comment-btn {
+      display: none;
+      position: fixed;
+      bottom: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 2500;
+      background: #2980b9; color: white; border: none;
+      padding: 10px 24px; border-radius: 24px;
+      font-size: 14px; font-weight: bold;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+      cursor: pointer; white-space: nowrap;
+    }
 
     /* チャットパネル（Leaflet の外・固定位置） */
     #chat-panel {
@@ -99,6 +110,9 @@
   <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="uploadPhoto(this)">
   <div id="map"></div>
   <div id="info"></div>
+
+  <!-- コメントボタン（ポップアップ外・固定位置） -->
+  <button id="float-comment-btn" onclick="onFloatCommentClick()" style="display:none">💬 コメントを見る・書く</button>
 
   <!-- チャットパネル（Leaflet の外なのでブラウザ標準の入力が使える） -->
   <div id="chat-panel">
@@ -195,6 +209,10 @@
     function closeChatPanel() {
       document.getElementById('chat-panel').style.display = 'none';
       currentPhotoUrl = null;
+      // ポップアップが開いたままならコメントボタンを再表示
+      if (currentPopupUrl) {
+        document.getElementById('float-comment-btn').style.display = 'block';
+      }
     }
 
     async function refreshPanelComments() {
@@ -250,12 +268,35 @@
               <div class="stars">${buildStars(rating || 0)}</div>
               <button class="save-rating">★保存</button>
             </div>
-            <button class="open-chat-btn">💬 コメントを見る・書く</button>
             <small>${time}</small>
           </div>
         `, { maxWidth: 260 })
         .addTo(map);
       return m;
+    }
+
+    // ポップアップが開いているときの url/time を保持
+    let currentPopupUrl = null, currentPopupTime = null, currentPopupObj = null;
+
+    function onFloatCommentClick() {
+      if (!currentPopupUrl) return;
+      document.getElementById('float-comment-btn').style.display = 'none';
+      openChatPanel(currentPopupUrl, currentPopupTime).then(() => {
+        // パネル描画後にポップアップ位置を調整
+        setTimeout(() => {
+          const pEl = currentPopupObj && currentPopupObj.getElement();
+          const chatPanel = document.getElementById('chat-panel');
+          if (!pEl || !chatPanel || chatPanel.style.display === 'none') return;
+          const popupRect = pEl.getBoundingClientRect();
+          const panelTop  = chatPanel.getBoundingClientRect().top;
+          const topBar    = document.getElementById('header').offsetHeight
+                          + document.getElementById('controls').offsetHeight;
+          let dy = 0;
+          if (popupRect.bottom > panelTop - 8)  dy = popupRect.bottom - panelTop + 16;
+          if (popupRect.top    < topBar   + 8)  dy = -(topBar + 12 - popupRect.top);
+          if (dy !== 0) map.panBy([0, dy], { animate: true, duration: 0.3 });
+        }, 80);
+      });
     }
 
     map.on('popupopen', async function(e) {
@@ -265,78 +306,61 @@
       const popupEl = e.popup.getElement();
       const popup = popupEl && popupEl.querySelector('.photo-popup');
       if (!popup) return;
-      const url = popup.dataset.url;
-      const time = popup.dataset.time;
+      currentPopupUrl  = popup.dataset.url;
+      currentPopupTime = popup.dataset.time;
+      currentPopupObj  = e.popup;
 
-      // チャットパネルを自動で開く
-      openChatPanel(url, time);
+      // コメントボタンを表示（チャットパネルが閉じているときのみ）
+      if (document.getElementById('chat-panel').style.display !== 'block') {
+        document.getElementById('float-comment-btn').style.display = 'block';
+      }
 
-      // チャットパネルとヘッダーを考慮してポップアップが隠れないよう自動パン
-      setTimeout(() => {
-        const pEl = e.popup.getElement();
-        const chatPanel = document.getElementById('chat-panel');
-        if (!pEl || !chatPanel) return;
-        const popupRect = pEl.getBoundingClientRect();
-        const panelTop  = chatPanel.getBoundingClientRect().top;
-        const topBar    = document.getElementById('header').offsetHeight
-                        + document.getElementById('controls').offsetHeight;
-        let dy = 0;
-        if (popupRect.bottom > panelTop - 8)  dy = popupRect.bottom - panelTop + 16;
-        if (popupRect.top    < topBar   + 8)  dy = -(topBar + 12 - popupRect.top);
-        if (dy !== 0) map.panBy([0, dy], { animate: true, duration: 0.25 });
-      }, 320);
-
-      // サーバーから最新の評価を取得
+      // 評価をサーバーから取得して星を更新
       let photo;
       try {
-        const r = await fetch(`photo-detail?url=${encodeURIComponent(url)}`);
+        const r = await fetch(`photo-detail?url=${encodeURIComponent(currentPopupUrl)}`);
         photo = await r.json();
-        photoMeta.set(url, { rating: photo.rating || 0, comments: photo.comments || [] });
+        photoMeta.set(currentPopupUrl, { rating: photo.rating || 0, comments: photo.comments || [] });
       } catch (_) {
-        photo = photoMeta.get(url) || { rating: 0, comments: [] };
+        photo = photoMeta.get(currentPopupUrl) || { rating: 0, comments: [] };
       }
-
       let currentRating = photo.rating || 0;
 
-      function reattach(selector) {
-        const el = popup.querySelector(selector);
-        const clone = el.cloneNode(true);
-        el.replaceWith(clone);
-        return clone;
+      // popup が既に閉じていたら中断
+      if (!currentPopupUrl) return;
+
+      const starsEl = popup.querySelector('.stars');
+      const saveBtn = popup.querySelector('.save-rating');
+      if (starsEl) {
+        starsEl.innerHTML = buildStars(currentRating);
+        starsEl.onclick = function(ev) {
+          const star = ev.target.closest('.star');
+          if (!star) return;
+          currentRating = parseInt(star.dataset.val);
+          starsEl.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('filled', i < currentRating));
+        };
       }
-      const newStars = reattach('.stars');
-      const newSaveRating = reattach('.save-rating');
-      const newOpenChat = reattach('.open-chat-btn');
-
-      newStars.innerHTML = buildStars(currentRating);
-      newStars.querySelectorAll('.star').forEach(star => {
-        star.addEventListener('click', function() {
-          currentRating = parseInt(this.dataset.val);
-          newStars.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('filled', i < currentRating));
-        });
-      });
-
-      newSaveRating.addEventListener('click', function() {
-        fetch('photo-meta', {
-          method: 'PATCH',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ url, rating: currentRating }),
-        }).then(r => r.json()).then(() => {
-          const cached = photoMeta.get(url) || {};
-          photoMeta.set(url, { ...cached, rating: currentRating });
-          newSaveRating.textContent = '✓保存';
-          setTimeout(() => { newSaveRating.textContent = '★保存'; }, 2000);
-        }).catch(() => { newSaveRating.textContent = 'エラー'; });
-      });
-
-      newOpenChat.addEventListener('click', function() {
-        openChatPanel(url, time);
-      });
+      if (saveBtn) {
+        saveBtn.onclick = function() {
+          fetch('photo-meta', {
+            method: 'PATCH',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ url: currentPopupUrl, rating: currentRating }),
+          }).then(r => r.json()).then(() => {
+            const cached = photoMeta.get(currentPopupUrl) || {};
+            photoMeta.set(currentPopupUrl, { ...cached, rating: currentRating });
+            saveBtn.textContent = '✓保存';
+            setTimeout(() => { saveBtn.textContent = '★保存'; }, 2000);
+          }).catch(() => { saveBtn.textContent = 'エラー'; });
+        };
+      }
     });
 
     map.on('popupclose', function() {
       map.dragging.enable();
       if (map.keyboard) map.keyboard.enable();
+      currentPopupUrl = null; currentPopupTime = null; currentPopupObj = null;
+      document.getElementById('float-comment-btn').style.display = 'none';
       closeChatPanel();
     });
 
