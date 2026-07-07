@@ -11,18 +11,7 @@
     #header { background: #2c3e50; color: white; padding: 10px 16px; }
     #header-top { display: flex; justify-content: space-between; align-items: center; }
     #header h1 { font-size: 18px; }
-    #btnToggle {
-      flex: none;
-      background: #7f8c8d;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: bold;
-      cursor: pointer;
-      white-space: nowrap;
-    }
+    #btnToggle { flex: none; background: #7f8c8d; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: bold; cursor: pointer; white-space: nowrap; }
     #btnToggle.active { background: #2980b9; }
     #status { font-size: 12px; margin-top: 4px; opacity: 0.8; }
     #photo-count { font-size: 11px; margin-top: 2px; opacity: 0.7; }
@@ -38,38 +27,58 @@
             background: rgba(0,0,0,0.7); color: white; padding: 8px 16px;
             border-radius: 20px; font-size: 13px; z-index: 1000; display: none; }
 
-    /* 写真ポップアップ */
-    .photo-popup { min-width: 220px; max-height: min(420px, calc(100vh - 210px)); overflow-y: auto; overscroll-behavior: contain; }
-    .photo-popup img { max-width: 220px; max-height: 120px; display: block; border-radius: 6px; }
-    .photo-popup small { display: block; margin-top: 4px; color: #666; font-size: 11px; }
-
-    /* 評価行 */
-    .rating-row { display: flex; align-items: center; gap: 6px; margin: 5px 0; }
+    /* 写真ポップアップ（評価のみ） */
+    .photo-popup { min-width: 220px; }
+    .photo-popup img { max-width: 220px; max-height: 140px; display: block; border-radius: 6px; }
+    .photo-popup small { display: block; margin-top: 6px; color: #666; font-size: 11px; }
+    .rating-row { display: flex; align-items: center; gap: 6px; margin: 6px 0 4px; }
     .rating-row .stars { flex: 1; font-size: 22px; line-height: 1; cursor: pointer; }
     .star { color: #ccc; transition: color 0.1s; }
     .star.filled { color: #f39c12; }
     .save-rating { background: #3498db; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; }
+    .open-chat-btn { width: 100%; margin-top: 4px; background: #2980b9; color: white; border: none; padding: 6px; border-radius: 6px; cursor: pointer; font-size: 12px; }
 
-    /* チャットエリア */
-    .chat-area-header { display: flex; justify-content: space-between; align-items: center; margin: 5px 0 2px; }
-    .chat-area-label { font-size: 11px; color: #999; }
-    .chat-refresh { background: none; border: none; font-size: 14px; cursor: pointer; padding: 0 2px; line-height: 1; }
-    .chat-area { max-height: 120px; overflow-y: auto; padding: 2px 0; border-top: 1px solid #eee; border-bottom: 1px solid #eee; }
+    /* チャットパネル（Leaflet の外・固定位置） */
+    #chat-panel {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: white;
+      border-top: 2px solid #2c3e50;
+      z-index: 3000;
+      padding: 8px 12px 10px;
+      box-shadow: 0 -3px 12px rgba(0,0,0,0.2);
+    }
+    #chat-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    #chat-panel-title { font-size: 12px; color: #555; font-weight: bold; }
+    #chat-panel-actions { display: flex; gap: 6px; align-items: center; }
+    #chat-panel-refresh { background: none; border: none; font-size: 16px; cursor: pointer; padding: 0; line-height: 1; }
+    #chat-panel-close { background: #e74c3c; color: white; border: none; border-radius: 4px; padding: 2px 8px; font-size: 13px; cursor: pointer; }
+    #chat-panel-messages { max-height: 120px; overflow-y: auto; padding: 4px 0; border-top: 1px solid #eee; border-bottom: 1px solid #eee; margin-bottom: 8px; }
     .chat-empty { color: #bbb; font-size: 11px; text-align: center; padding: 6px; }
     .chat-msg { margin: 3px 0; display: flex; flex-direction: column; }
     .chat-msg.mine { align-items: flex-end; }
     .chat-msg.other { align-items: flex-start; }
     .chat-author { font-size: 10px; color: #999; margin-bottom: 1px; }
-    .chat-bubble { display: inline-block; padding: 5px 9px; border-radius: 12px; font-size: 12px; max-width: 90%; word-break: break-word; line-height: 1.4; }
+    .chat-bubble { display: inline-block; padding: 5px 10px; border-radius: 14px; font-size: 13px; max-width: 85%; word-break: break-word; line-height: 1.4; }
     .chat-msg.mine .chat-bubble { background: #27ae60; color: white; border-bottom-right-radius: 4px; }
     .chat-msg.other .chat-bubble { background: #ecf0f1; color: #2c3e50; border-bottom-left-radius: 4px; }
     .chat-time { font-size: 10px; color: #aaa; margin-top: 1px; }
-
-    /* コメント入力行 */
-    .chat-input-row { display: flex; gap: 4px; margin-top: 5px; }
-    .chat-input { flex: 1; padding: 5px 8px; font-size: 12px; border: 1px solid #ddd; border-radius: 6px; outline: none; resize: none; font-family: sans-serif; pointer-events: auto !important; -webkit-user-select: text !important; user-select: text !important; }
-    .chat-send { background: #27ae60; color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; white-space: nowrap; }
-    .chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+    #chat-panel-input-row { display: flex; gap: 8px; align-items: flex-end; }
+    #chat-panel-input {
+      flex: 1;
+      padding: 8px 12px;
+      font-size: 15px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      resize: none;
+      font-family: sans-serif;
+      line-height: 1.4;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+    #chat-panel-send { background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 14px; cursor: pointer; white-space: nowrap; font-weight: bold; }
+    #chat-panel-send:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -91,28 +100,31 @@
   <div id="map"></div>
   <div id="info"></div>
 
+  <!-- チャットパネル（Leaflet の外なのでブラウザ標準の入力が使える） -->
+  <div id="chat-panel">
+    <div id="chat-panel-header">
+      <span id="chat-panel-title">💬 コメント</span>
+      <div id="chat-panel-actions">
+        <button id="chat-panel-refresh" onclick="refreshPanelComments()" title="最新コメントを取得">🔄</button>
+        <button id="chat-panel-close" onclick="closeChatPanel()">✕ 閉じる</button>
+      </div>
+    </div>
+    <div id="chat-panel-messages"></div>
+    <div id="chat-panel-input-row">
+      <textarea id="chat-panel-input" rows="1" placeholder="コメントを入力..."></textarea>
+      <button id="chat-panel-send" onclick="sendPanelComment()">送信</button>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/exifr/dist/lite.umd.js"></script>
   <script>
     function getDeviceId() {
       let id = localStorage.getItem('gps_device_id');
-      if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem('gps_device_id', id);
-      }
+      if (!id) { id = crypto.randomUUID(); localStorage.setItem('gps_device_id', id); }
       return id;
     }
     const deviceId = getDeviceId();
-
-    // Leaflet の mousedown/click 横取りより先にキャプチャして chat-input にフォーカスを与える
-    ['mousedown', 'click'].forEach(function(evtName) {
-      document.addEventListener(evtName, function(e) {
-        if (e.target.classList.contains('chat-input')) {
-          e.stopImmediatePropagation();
-          if (evtName === 'mousedown') e.target.focus();
-        }
-      }, true); // true = capture phase（旧ブラウザ互換）
-    });
 
     const map = L.map('map').setView([43.0646, 141.3468], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -125,69 +137,102 @@
     let points = [];
     const INTERVAL_MS = 5000;
     let lastSent = 0;
-    let currentLat = null;
-    let currentLng = null;
+    let currentLat = null, currentLng = null;
 
     const myPhotoIcon = L.divIcon({
       html: '<div style="background:#e67e22;border:2px solid white;border-radius:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 5px rgba(0,0,0,0.5);">📷</div>',
-      className: '',
-      iconSize: [34, 34],
-      iconAnchor: [17, 17],
-      popupAnchor: [0, -19],
+      className: '', iconSize: [34,34], iconAnchor: [17,17], popupAnchor: [0,-19],
     });
-
     const otherPhotoIcon = L.divIcon({
       html: '<div style="background:#2980b9;border:2px solid white;border-radius:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 5px rgba(0,0,0,0.5);">📷</div>',
-      className: '',
-      iconSize: [34, 34],
-      iconAnchor: [17, 17],
-      popupAnchor: [0, -19],
+      className: '', iconSize: [34,34], iconAnchor: [17,17], popupAnchor: [0,-19],
     });
 
-    function setStatus(text) {
-      document.getElementById('status').textContent = text;
+    function setStatus(t) { document.getElementById('status').textContent = t; }
+    function showInfo(t) { const el = document.getElementById('info'); el.textContent = t; el.style.display = 'block'; }
+    function escapeHtml(t) {
+      return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
-
-    function showInfo(text) {
-      const el = document.getElementById('info');
-      el.textContent = text;
-      el.style.display = 'block';
-    }
-
-    function escapeHtml(text) {
-      return String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-    }
-
     function buildStars(rating) {
       return [1,2,3,4,5].map(i =>
-        `<span class="star ${i <= (rating||0) ? 'filled' : ''}" data-val="${i}">★</span>`
+        `<span class="star ${i<=(rating||0)?'filled':''}" data-val="${i}">★</span>`
       ).join('');
     }
 
-    function renderComments(popup, comments) {
-      const chatArea = popup.querySelector('.chat-area');
-      if (!chatArea) return;
+    // ── チャットパネル（Leaflet の外） ──────────────────────────
+    let currentPhotoUrl = null;
+
+    function renderPanelComments(comments) {
+      const el = document.getElementById('chat-panel-messages');
       if (!comments || comments.length === 0) {
-        chatArea.innerHTML = '<div class="chat-empty">コメントはまだありません</div>';
+        el.innerHTML = '<div class="chat-empty">コメントはまだありません</div>';
         return;
       }
-      chatArea.innerHTML = comments.map(c => {
+      el.innerHTML = comments.map(c => {
         const isMe = c.deviceId === deviceId;
-        const time = new Date(c.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        const time = new Date(c.timestamp).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
         const author = isMe ? 'あなた' : c.deviceId.slice(0, 6);
-        return `
-          <div class="chat-msg ${isMe ? 'mine' : 'other'}">
-            ${!isMe ? `<div class="chat-author">${escapeHtml(author)}</div>` : ''}
-            <div class="chat-bubble">${escapeHtml(c.text)}</div>
-            <div class="chat-time">${time}</div>
-          </div>
-        `;
+        return `<div class="chat-msg ${isMe?'mine':'other'}">
+          ${!isMe ? `<div class="chat-author">${escapeHtml(author)}</div>` : ''}
+          <div class="chat-bubble">${escapeHtml(c.text)}</div>
+          <div class="chat-time">${time}</div>
+        </div>`;
       }).join('');
-      chatArea.scrollTop = chatArea.scrollHeight;
+      el.scrollTop = el.scrollHeight;
     }
+
+    async function openChatPanel(url, time) {
+      currentPhotoUrl = url;
+      document.getElementById('chat-panel-title').textContent = `💬 コメント（${time}）`;
+      document.getElementById('chat-panel').style.display = 'block';
+      await refreshPanelComments();
+    }
+
+    function closeChatPanel() {
+      document.getElementById('chat-panel').style.display = 'none';
+      currentPhotoUrl = null;
+    }
+
+    async function refreshPanelComments() {
+      if (!currentPhotoUrl) return;
+      const btn = document.getElementById('chat-panel-refresh');
+      btn.textContent = '⏳';
+      try {
+        const r = await fetch(`photo-detail?url=${encodeURIComponent(currentPhotoUrl)}`);
+        const photo = await r.json();
+        const cached = photoMeta.get(currentPhotoUrl) || {};
+        photoMeta.set(currentPhotoUrl, { ...cached, comments: photo.comments || [] });
+        renderPanelComments(photo.comments || []);
+      } catch (_) {}
+      btn.textContent = '🔄';
+    }
+
+    async function sendPanelComment() {
+      const input = document.getElementById('chat-panel-input');
+      const text = input.value.trim();
+      if (!text || !currentPhotoUrl) return;
+      input.value = '';
+      const sendBtn = document.getElementById('chat-panel-send');
+      sendBtn.disabled = true;
+      try {
+        await fetch('photo-comment', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ url: currentPhotoUrl, deviceId, text }),
+        });
+        await refreshPanelComments();
+      } catch (_) {}
+      sendBtn.disabled = false;
+      input.focus();
+    }
+
+    document.getElementById('chat-panel-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendPanelComment(); }
+    });
+
+    // ── 写真マーカー ─────────────────────────────────────────────
+    let photoMarkers = [], otherMarkers = [], showAll = false;
+    const photoMeta = new Map();
 
     function addPhotoMarker(lat, lng, url, timestamp, rating, comments, isOwn) {
       photoMeta.set(url, { rating: rating || 0, comments: comments || [] });
@@ -195,23 +240,13 @@
       const icon = isOwn ? myPhotoIcon : otherPhotoIcon;
       const m = L.marker([lat, lng], { icon })
         .bindPopup(`
-          <div class="photo-popup" data-url="${url}">
+          <div class="photo-popup" data-url="${url}" data-time="${escapeHtml(time)}">
             <img src="${url}">
             <div class="rating-row">
-              <div class="stars"></div>
+              <div class="stars">${buildStars(rating || 0)}</div>
               <button class="save-rating">★保存</button>
             </div>
-            <div class="chat-area-header">
-              <span class="chat-area-label">💬 コメント</span>
-              <button class="chat-refresh" title="最新コメントを取得">🔄</button>
-            </div>
-            <div class="chat-area"></div>
-            <div class="chat-input-row">
-              <textarea class="chat-input" rows="1" placeholder="コメントを入力..."
-                onmousedown="event.stopImmediatePropagation();this.focus();"
-                onclick="event.stopPropagation();"></textarea>
-              <button class="chat-send">送信</button>
-            </div>
+            <button class="open-chat-btn">💬 コメントを見る・書く</button>
             <small>${time}</small>
           </div>
         `, { maxWidth: 260 })
@@ -219,23 +254,20 @@
       return m;
     }
 
-    // ポップアップ表示中はマップのドラッグ・キーボード操作を無効化（PC での入力フォーカス保護）
-    map.on('popupopen', function() {
+    map.on('popupopen', async function(e) {
       map.dragging.disable();
       if (map.keyboard) map.keyboard.disable();
-    });
-    map.on('popupclose', function() {
-      map.dragging.enable();
-      if (map.keyboard) map.keyboard.enable();
-    });
 
-    map.on('popupopen', async function(e) {
       const popupEl = e.popup.getElement();
       const popup = popupEl && popupEl.querySelector('.photo-popup');
       if (!popup) return;
       const url = popup.dataset.url;
+      const time = popup.dataset.time;
 
-      // サーバーから最新データを取得（他デバイスのコメントも反映）
+      // チャットパネルを自動で開く
+      openChatPanel(url, time);
+
+      // サーバーから最新の評価を取得
       let photo;
       try {
         const r = await fetch(`photo-detail?url=${encodeURIComponent(url)}`);
@@ -247,13 +279,6 @@
 
       let currentRating = photo.rating || 0;
 
-      // 星の初期表示
-      popup.querySelector('.stars').innerHTML = buildStars(currentRating);
-
-      // コメント一覧を描画
-      renderComments(popup, photo.comments || []);
-
-      // 古いリスナーを除去してからアタッチ
       function reattach(selector) {
         const el = popup.querySelector(selector);
         const clone = el.cloneNode(true);
@@ -262,35 +287,20 @@
       }
       const newStars = reattach('.stars');
       const newSaveRating = reattach('.save-rating');
-      const newRefreshBtn = reattach('.chat-refresh');
-      const newSendBtn = reattach('.chat-send');
-      const chatInput = popup.querySelector('.chat-input');
+      const newOpenChat = reattach('.open-chat-btn');
 
-      async function refreshComments() {
-        newRefreshBtn.textContent = '⏳';
-        try {
-          const r = await fetch(`photo-detail?url=${encodeURIComponent(url)}`);
-          const latest = await r.json();
-          photoMeta.set(url, { rating: latest.rating || 0, comments: latest.comments || [] });
-          renderComments(popup, latest.comments || []);
-        } catch (_) {}
-        newRefreshBtn.textContent = '🔄';
-      }
-      newRefreshBtn.addEventListener('click', refreshComments);
-
+      newStars.innerHTML = buildStars(currentRating);
       newStars.querySelectorAll('.star').forEach(star => {
         star.addEventListener('click', function() {
           currentRating = parseInt(this.dataset.val);
-          newStars.querySelectorAll('.star').forEach((s, i) => {
-            s.classList.toggle('filled', i < currentRating);
-          });
+          newStars.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('filled', i < currentRating));
         });
       });
 
       newSaveRating.addEventListener('click', function() {
         fetch('photo-meta', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ url, rating: currentRating }),
         }).then(r => r.json()).then(() => {
           const cached = photoMeta.get(url) || {};
@@ -300,48 +310,24 @@
         }).catch(() => { newSaveRating.textContent = 'エラー'; });
       });
 
-      async function sendComment() {
-        const text = chatInput.value.trim();
-        if (!text) return;
-        chatInput.value = '';
-        newSendBtn.disabled = true;
-        try {
-          const r = await fetch('photo-comment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, deviceId, text }),
-          });
-          const entry = await r.json();
-          const cached = photoMeta.get(url) || { rating: currentRating, comments: [] };
-          const comments = [...(cached.comments || []), entry];
-          photoMeta.set(url, { ...cached, comments });
-          renderComments(popup, comments);
-        } catch (_) {}
-        newSendBtn.disabled = false;
-      }
-
-      newSendBtn.addEventListener('click', sendComment);
-      chatInput.addEventListener('keydown', ev => {
-        if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); sendComment(); }
+      newOpenChat.addEventListener('click', function() {
+        openChatPanel(url, time);
       });
     });
 
-    let photoMarkers = [];
-    let otherMarkers = [];
-    let showAll = false;
-    const photoMeta = new Map(); // url → {rating, comments}
+    map.on('popupclose', function() {
+      map.dragging.enable();
+      if (map.keyboard) map.keyboard.enable();
+      closeChatPanel();
+    });
 
-    function addMyPhotoMarker(lat, lng, url, timestamp, rating, comments) {
-      const m = addPhotoMarker(lat, lng, url, timestamp, rating, comments, true);
+    function addMyPhotoMarker(lat, lng, url, ts, rating, comments) {
+      const m = addPhotoMarker(lat, lng, url, ts, rating, comments, true);
       if (m) photoMarkers.push(m);
     }
-
-    function addOtherPhotoMarker(lat, lng, url, timestamp, rating, comments) {
-      const m = addPhotoMarker(lat, lng, url, timestamp, rating, comments, false);
-      if (m) {
-        m.remove();
-        otherMarkers.push(m);
-      }
+    function addOtherPhotoMarker(lat, lng, url, ts, rating, comments) {
+      const m = addPhotoMarker(lat, lng, url, ts, rating, comments, false);
+      if (m) { m.remove(); otherMarkers.push(m); }
     }
 
     function toggleView() {
@@ -349,180 +335,103 @@
       const btn = document.getElementById('btnToggle');
       if (showAll) {
         otherMarkers.forEach(m => m.addTo(map));
-        btn.textContent = '🌐 全員分';
-        btn.classList.add('active');
+        btn.textContent = '🌐 全員分'; btn.classList.add('active');
       } else {
         otherMarkers.forEach(m => m.remove());
-        btn.textContent = '👤 自分のみ';
-        btn.classList.remove('active');
+        btn.textContent = '👤 自分のみ'; btn.classList.remove('active');
       }
       updatePhotoCount();
     }
 
     function updatePhotoCount() {
-      const myCount = photoMarkers.length;
-      const totalCount = myCount + otherMarkers.length;
-      if (totalCount === 0) {
-        document.getElementById('photo-count').textContent = '';
-      } else if (showAll) {
-        document.getElementById('photo-count').textContent =
-          `📷 全${totalCount}件（自分${myCount} / 他${otherMarkers.length}）`;
-      } else {
-        document.getElementById('photo-count').textContent =
-          `📷 自分${myCount}件（全${totalCount}件）`;
-      }
+      const my = photoMarkers.length, total = my + otherMarkers.length;
+      document.getElementById('photo-count').textContent = total === 0 ? '' :
+        showAll ? `📷 全${total}件（自分${my} / 他${otherMarkers.length}）` :
+                  `📷 自分${my}件（全${total}件）`;
     }
 
     function showAllPhotos() {
-      const visible = showAll
-        ? [...photoMarkers, ...otherMarkers]
-        : photoMarkers;
-      if (visible.length === 0) return;
-      const bounds = L.latLngBounds(visible.map(m => m.getLatLng()));
-      map.fitBounds(bounds, { padding: [40, 40] });
+      const visible = showAll ? [...photoMarkers, ...otherMarkers] : photoMarkers;
+      if (!visible.length) return;
+      map.fitBounds(L.latLngBounds(visible.map(m => m.getLatLng())), { padding:[40,40] });
     }
 
     fetch(`last-position?deviceId=${encodeURIComponent(deviceId)}`)
-      .then(r => r.json())
-      .then(pos => { if (pos) map.setView([pos.lat, pos.lng], 13); })
-      .catch(() => {});
+      .then(r => r.json()).then(pos => { if (pos) map.setView([pos.lat, pos.lng], 13); }).catch(() => {});
 
-    fetch('photos-list')
-      .then(r => r.json())
-      .then(allList => {
-        allList.forEach(p => {
-          if (p.deviceId === deviceId) {
-            addMyPhotoMarker(p.lat, p.lng, p.url, p.timestamp, p.rating, p.comments);
-          } else {
-            addOtherPhotoMarker(p.lat, p.lng, p.url, p.timestamp, p.rating, p.comments);
-          }
-        });
-        updatePhotoCount();
-      })
-      .catch(() => {});
+    fetch('photos-list').then(r => r.json()).then(list => {
+      list.forEach(p => {
+        if (p.deviceId === deviceId) addMyPhotoMarker(p.lat, p.lng, p.url, p.timestamp, p.rating, p.comments);
+        else addOtherPhotoMarker(p.lat, p.lng, p.url, p.timestamp, p.rating, p.comments);
+      });
+      updatePhotoCount();
+    }).catch(() => {});
 
     async function sendLocation(lat, lng, speed, accuracy) {
       try {
-        await fetch('location', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat, lng, speed, accuracy, deviceId })
-        });
-      } catch (e) {
-        console.error('送信エラー:', e);
-      }
+        await fetch('location', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ lat, lng, speed, accuracy, deviceId }) });
+      } catch (e) { console.error('送信エラー:', e); }
     }
 
     function startTracking() {
-      if (!navigator.geolocation) {
-        alert('このブラウザはGeolocationに対応していません');
-        return;
-      }
-      points = [];
-      polyline.setLatLngs([]);
+      if (!navigator.geolocation) { alert('このブラウザはGeolocationに対応していません'); return; }
+      points = []; polyline.setLatLngs([]);
       document.getElementById('btnStart').disabled = true;
       document.getElementById('btnStop').disabled = false;
       setStatus('トラッキング中...');
-
-      fetch('tracking', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({active: true, deviceId}) });
-
+      fetch('tracking', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active:true, deviceId}) });
       watchId = navigator.geolocation.watchPosition(pos => {
-        const { latitude: lat, longitude: lng, speed, accuracy } = pos.coords;
+        const { latitude:lat, longitude:lng, speed, accuracy } = pos.coords;
         const now = Date.now();
-        currentLat = lat;
-        currentLng = lng;
-
-        points.push([lat, lng]);
-        polyline.setLatLngs(points);
-        map.setView([lat, lng]);
-
+        currentLat = lat; currentLng = lng;
+        points.push([lat, lng]); polyline.setLatLngs(points); map.setView([lat, lng]);
         if (marker) marker.setLatLng([lat, lng]);
-        else marker = L.circleMarker([lat, lng], { radius: 8, color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 1 }).addTo(map);
-
+        else marker = L.circleMarker([lat, lng], { radius:8, color:'#e74c3c', fillColor:'#e74c3c', fillOpacity:1 }).addTo(map);
         showInfo(`📍 ${lat.toFixed(5)}, ${lng.toFixed(5)} | 精度: ${Math.round(accuracy)}m`);
-
         if (now - lastSent >= INTERVAL_MS) {
-          lastSent = now;
-          sendLocation(lat, lng, speed || 0, accuracy);
+          lastSent = now; sendLocation(lat, lng, speed||0, accuracy);
           setStatus(`送信済み ${new Date().toLocaleTimeString('ja-JP')}`);
         }
-      }, err => {
-        setStatus('位置情報エラー: ' + err.message);
-      }, { enableHighAccuracy: true, maximumAge: 0 });
+      }, err => setStatus('位置情報エラー: ' + err.message), { enableHighAccuracy:true, maximumAge:0 });
     }
 
     function stopTracking() {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-      }
+      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
       document.getElementById('btnStart').disabled = false;
       document.getElementById('btnStop').disabled = true;
       setStatus(`完了 - ${points.length}ポイント記録`);
-      fetch('tracking', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({active: false, deviceId}) });
+      fetch('tracking', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active:false, deviceId}) });
     }
 
     async function uploadPhoto(input) {
-      const file = input.files[0];
-      if (!file) return;
-
+      const file = input.files[0]; if (!file) return;
       setStatus('EXIF確認中...');
-
-      let lat = null;
-      let lng = null;
-      let source = '';
-
+      let lat = null, lng = null, source = '';
       try {
         const gps = await exifr.gps(file);
-        if (gps && gps.latitude && gps.longitude) {
-          lat = gps.latitude;
-          lng = gps.longitude;
-          source = 'EXIF';
-        }
-      } catch (e) {}
-
-      if (lat === null && currentLat !== null) {
-        lat = currentLat;
-        lng = currentLng;
-        source = 'トラッキング位置';
-      }
-
+        if (gps && gps.latitude) { lat = gps.latitude; lng = gps.longitude; source = 'EXIF'; }
+      } catch (_) {}
+      if (lat === null && currentLat !== null) { lat = currentLat; lng = currentLng; source = 'トラッキング位置'; }
       if (lat === null) {
         setStatus('現在地取得中...');
         try {
           const pos = await new Promise((resolve, reject) =>
-            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 })
-          );
-          lat = pos.coords.latitude;
-          lng = pos.coords.longitude;
-          source = '現在地';
-        } catch (e) {
-          alert('位置情報を取得できませんでした: ' + e.message);
-          setStatus('待機中');
-          input.value = '';
-          return;
-        }
+            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy:true, timeout:10000 }));
+          lat = pos.coords.latitude; lng = pos.coords.longitude; source = '現在地';
+        } catch (e) { alert('位置情報を取得できませんでした: ' + e.message); setStatus('待機中'); input.value=''; return; }
       }
-
       setStatus(`アップロード中... (${source})`);
       try {
-        const formData = new FormData();
-        formData.append('photo', file);
-        formData.append('lat', lat);
-        formData.append('lng', lng);
-        formData.append('deviceId', deviceId);
-
-        const resp = await fetch('photo', { method: 'POST', body: formData });
+        const fd = new FormData();
+        fd.append('photo', file); fd.append('lat', lat); fd.append('lng', lng); fd.append('deviceId', deviceId);
+        const resp = await fetch('photo', { method:'POST', body:fd });
         const data = await resp.json();
-
         addMyPhotoMarker(data.lat, data.lng, data.url, data.timestamp, 0, []);
         map.setView([data.lat, data.lng]);
         setStatus(`写真を追加しました（${source}）`);
         updatePhotoCount();
-      } catch (e) {
-        alert('アップロードに失敗しました: ' + e.message);
-        setStatus('待機中');
-      }
+      } catch (e) { alert('アップロードに失敗しました: ' + e.message); setStatus('待機中'); }
       input.value = '';
     }
   </script>
