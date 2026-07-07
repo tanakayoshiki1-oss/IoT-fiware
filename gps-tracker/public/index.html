@@ -208,7 +208,13 @@
     }
 
     map.on('popupopen', async function(e) {
-      const popup = e.popup.getElement().querySelector('.photo-popup');
+      // Leaflet が mousedown を地図ドラッグとして横取りするのを防ぐ（PC でのテキスト入力対策）
+      const popupEl = e.popup.getElement();
+      if (popupEl) {
+        L.DomEvent.disableClickPropagation(popupEl);
+        L.DomEvent.disableScrollPropagation(popupEl);
+      }
+      const popup = popupEl && popupEl.querySelector('.photo-popup');
       if (!popup) return;
       const url = popup.dataset.url;
 
