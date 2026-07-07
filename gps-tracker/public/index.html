@@ -438,6 +438,23 @@
       currentPopupTime = popup.dataset.time;
       currentPopupObj  = e.popup;
 
+      // 画像ロード後にポップアップを再計算してヘッダー分だけパン補正
+      const img = popup.querySelector('img');
+      if (img && !img.complete) {
+        img.onload = () => {
+          if (!currentPopupObj) return;
+          currentPopupObj.update();
+          const el = currentPopupObj.getElement();
+          if (!el) return;
+          const rect = el.getBoundingClientRect();
+          const topBar = document.getElementById('header').offsetHeight
+                       + document.getElementById('controls').offsetHeight;
+          if (rect.top < topBar + 8) {
+            map.panBy([0, -(topBar + 12 - rect.top)], { animate: true, duration: 0.3 });
+          }
+        };
+      }
+
       // コメントボタンを表示（チャットパネルが閉じているときのみ）
       if (document.getElementById('chat-panel').style.display !== 'block') {
         document.getElementById('float-comment-btn').style.display = 'block';
