@@ -194,6 +194,18 @@ app.post('/photo-comment', (req, res) => {
   res.json(entry);
 });
 
+// 旧deviceId → 新deviceId への一括変更（本人確認なし・個人用途のみ）
+app.post('/rename-device', (req, res) => {
+  const { oldId, newId } = req.body;
+  if (!newId || !String(newId).trim()) return res.status(400).json({ error: 'newId required' });
+  let count = 0;
+  photosList.forEach(p => {
+    if (!oldId || p.deviceId === oldId) { p.deviceId = String(newId).trim(); count++; }
+  });
+  fs.writeFileSync(PHOTOS_DATA, JSON.stringify(photosList));
+  res.json({ updated: count });
+});
+
 app.listen(PORT, () => {
   console.log(`GPSトラッカーサーバー起動: http://localhost:${PORT}`);
 });

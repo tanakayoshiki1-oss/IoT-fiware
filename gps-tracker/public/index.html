@@ -99,7 +99,7 @@
       <button id="btnToggle" onclick="toggleView()">👤 自分のみ</button>
     </div>
     <div id="status">待機中</div>
-    <div id="photo-count"></div>
+    <div id="photo-count" title="長押しでデバイスID確認" style="cursor:pointer"></div>
   </div>
   <div id="controls">
     <button id="btnStart" onclick="startTracking()">▶ スタート</button>
@@ -133,20 +133,66 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/exifr/dist/lite.umd.js"></script>
   <script>
-    function getDeviceId() {
-      // localStorage → クッキーの順に読み込み（キャッシュクリアでlocalStorageが消えてもクッキーで復元）
-      let id = localStorage.getItem('gps_device_id');
-      if (!id) {
-        const m = document.cookie.match(/(?:^|;\s*)gps_device_id=([^;]+)/);
-        if (m) id = m[1];
-      }
-      if (!id) id = crypto.randomUUID();
+    function saveDeviceId(id) {
       localStorage.setItem('gps_device_id', id);
       const exp = new Date(Date.now() + 365 * 24 * 3600 * 1000).toUTCString();
       document.cookie = `gps_device_id=${id}; expires=${exp}; path=/; SameSite=Lax`;
+    }
+
+    function getDeviceId() {
+      // localStorage → クッキーの順に読み込み
+      let id = localStorage.getItem('gps_device_id');
+      if (!id) {
+        const m = document.cookie.match(/(?:^|;\s*)gps_device_id=([^;]+)/);
+        if (m) id = decodeURIComponent(m[1]);
+      }
+      if (!id) {
+        // 初回: ユーザー名を入力させる（UUIDではなく覚えられる名前）
+        let name = '';
+        while (!name) {
+          name = (prompt('このデバイスの名前を入力してください\n（例: tanaka, iphone-yoshiki）\n\nキャッシュクリアしても同じ名前を入力すれば写真が自分のものとして表示されます。') || '').trim();
+        }
+        id = name;
+      }
+      saveDeviceId(id);
       return id;
     }
-    const deviceId = getDeviceId();
+    let deviceId = getDeviceId();
+
+    // photo-count 長押し → deviceId 確認・変更
+    (() => {
+      const el = document.getElementById('photo-count');
+      let timer;
+      el.addEventListener('pointerdown', () => { timer = setTimeout(showDeviceIdDialog, 800); });
+      el.addEventListener('pointerup',   () => clearTimeout(timer));
+      el.addEventListener('pointerleave',() => clearTimeout(timer));
+    })();
+
+    function showDeviceIdDialog() {
+      const current = deviceId;
+      const input = prompt(
+        `現在のデバイス名: ${current}\n\n変更する場合は新しい名前を入力（空欄でキャンセル）`,
+        current
+      );
+      if (!input || !input.trim() || input.trim() === current) return;
+      const newId = input.trim();
+      const migrate = confirm(`このデバイスで登録した既存の写真を\n「${newId}」に引き継ぎますか？`);
+      if (migrate) {
+        fetch('rename-device', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldId: current, newId }),
+        }).then(r => r.json()).then(d => {
+          saveDeviceId(newId);
+          alert(`${d.updated}件の写真を引き継ぎました。ページを再読み込みします。`);
+          location.reload();
+        });
+      } else {
+        saveDeviceId(newId);
+        alert(`デバイス名を「${newId}」に変更しました。ページを再読み込みします。`);
+        location.reload();
+      }
+    }
 
     const map = L.map('map').setView([43.0646, 141.3468], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
