@@ -137,6 +137,15 @@ app.get('/photos-list', (req, res) => {
   res.json(deviceId ? photosList.filter(p => p.deviceId === deviceId) : photosList);
 });
 
+app.patch('/photo-meta', (req, res) => {
+  const { url, rating, comment } = req.body;
+  const idx = photosList.findIndex(p => p.url === url);
+  if (idx === -1) return res.status(404).json({ error: 'not found' });
+  photosList[idx] = { ...photosList[idx], rating, comment };
+  fs.writeFileSync(PHOTOS_DATA, JSON.stringify(photosList));
+  res.json(photosList[idx]);
+});
+
 app.listen(PORT, () => {
   console.log(`GPSトラッカーサーバー起動: http://localhost:${PORT}`);
 });

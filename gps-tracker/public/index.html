@@ -23,8 +23,14 @@
             background: rgba(0,0,0,0.7); color: white; padding: 8px 16px;
             border-radius: 20px; font-size: 13px; z-index: 1000; display: none; }
     .photo-marker { font-size: 24px; text-align: center; line-height: 1; }
-    .photo-popup img { max-width: 220px; max-height: 220px; display: block; border-radius: 6px; }
+    .photo-popup { min-width: 220px; }
+    .photo-popup img { max-width: 220px; max-height: 180px; display: block; border-radius: 6px; }
     .photo-popup small { display: block; margin-top: 4px; color: #666; font-size: 11px; }
+    .stars { margin: 6px 0 2px; font-size: 24px; line-height: 1; cursor: pointer; }
+    .star { color: #ccc; transition: color 0.1s; }
+    .star.filled { color: #f39c12; }
+    .comment-input { width: 100%; margin: 4px 0; padding: 4px; font-size: 12px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; resize: none; }
+    .save-meta { background: #27ae60; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; width: 100%; margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -88,15 +94,73 @@
       el.style.display = 'block';
     }
 
-    function addPhotoMarker(lat, lng, url, timestamp) {
+    function buildStars(rating) {
+      return [1,2,3,4,5].map(i =>
+        `<span class="star ${i <= (rating||0) ? 'filled' : ''}" data-val="${i}">★</span>`
+      ).join('');
+    }
+
+    function addPhotoMarker(lat, lng, url, timestamp, rating, comment) {
+      photoMeta.set(url, { rating: rating || 0, comment: comment || '' });
       const time = new Date(timestamp).toLocaleString('ja-JP');
       const m = L.marker([lat, lng], { icon: photoIcon })
-        .bindPopup(`<div class="photo-popup"><img src="${url}"><small>${time}</small></div>`)
+        .bindPopup(`
+          <div class="photo-popup" data-url="${url}" data-time="${time}">
+            <img src="${url}">
+            <div class="stars"></div>
+            <textarea class="comment-input" rows="2" placeholder="コメント"></textarea>
+            <button class="save-meta">保存</button>
+            <small>${time}</small>
+          </div>
+        `, { maxWidth: 260 })
         .addTo(map);
       return m;
     }
 
+    map.on('popupopen', function(e) {
+      const popup = e.popup.getElement().querySelector('.photo-popup');
+      if (!popup) return;
+      const url = popup.dataset.url;
+      const meta = photoMeta.get(url) || { rating: 0, comment: '' };
+      let currentRating = meta.rating;
+
+      // 星とコメントを現在の保存値で復元
+      popup.querySelector('.stars').innerHTML = buildStars(currentRating);
+      popup.querySelector('.comment-input').value = meta.comment;
+
+      // 古いリスナーを除去するためクローン置換
+      const starsEl = popup.querySelector('.stars');
+      const newStars = starsEl.cloneNode(true);
+      starsEl.replaceWith(newStars);
+      const saveBtn = popup.querySelector('.save-meta');
+      const newSaveBtn = saveBtn.cloneNode(true);
+      saveBtn.replaceWith(newSaveBtn);
+
+      newStars.querySelectorAll('.star').forEach(star => {
+        star.addEventListener('click', function() {
+          currentRating = parseInt(this.dataset.val);
+          newStars.querySelectorAll('.star').forEach((s, i) => {
+            s.classList.toggle('filled', i < currentRating);
+          });
+        });
+      });
+
+      newSaveBtn.addEventListener('click', function() {
+        const comment = popup.querySelector('.comment-input').value;
+        fetch('photo-meta', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, rating: currentRating, comment }),
+        }).then(r => r.json()).then(() => {
+          photoMeta.set(url, { rating: currentRating, comment });
+          newSaveBtn.textContent = '✓ 保存済み';
+          setTimeout(() => { newSaveBtn.textContent = '保存'; }, 2000);
+        }).catch(() => { newSaveBtn.textContent = 'エラー'; });
+      });
+    });
+
     let photoMarkers = [];
+    const photoMeta = new Map(); // url → {rating, comment}
 
     function addPhotoMarkerTracked(lat, lng, url, timestamp) {
       const m = addPhotoMarker(lat, lng, url, timestamp);
@@ -118,7 +182,7 @@
     fetch(`photos-list?deviceId=${encodeURIComponent(deviceId)}`)
       .then(r => r.json())
       .then(list => {
-        list.forEach(p => addPhotoMarkerTracked(p.lat, p.lng, p.url, p.timestamp));
+        list.forEach(p => addPhotoMarkerTracked(p.lat, p.lng, p.url, p.timestamp, p.rating, p.comment));
         document.getElementById('photo-count').textContent =
           `📷 ${list.length}件の写真`;
       })
@@ -241,7 +305,7 @@
         const resp = await fetch('photo', { method: 'POST', body: formData });
         const data = await resp.json();
 
-        addPhotoMarkerTracked(data.lat, data.lng, data.url, data.timestamp);
+        addPhotoMarkerTracked(data.lat, data.lng, data.url, data.timestamp, 0, '');
         map.setView([data.lat, data.lng]);
         setStatus(`写真を追加しました（${source}）`);
       } catch (e) {
