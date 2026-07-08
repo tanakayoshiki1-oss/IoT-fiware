@@ -213,12 +213,29 @@ app.post('/route', (req, res) => {
     authorName: authorName ? String(authorName).trim().slice(0, 20) : null,
     points,
     startTime: startTime || new Date().toISOString(),
-    endTime: endTime || new Date().toISOString(),
+    endTime: endTime || null,
   };
   routesList.push(entry);
   fs.writeFileSync(ROUTES_DATA, JSON.stringify(routesList));
-  console.log(`[${new Date().toLocaleString('ja-JP')}] ルート保存: ${entry.id} ${points.length}pts (${authorName || deviceId})`);
+  console.log(`[${new Date().toLocaleString('ja-JP')}] ルート作成: ${entry.id} ${points.length}pts (${authorName || deviceId})`);
   res.json(entry);
+});
+
+// ルートへのポイント追記・完了マーク（チャンク保存用）
+app.patch('/route/:id', (req, res) => {
+  const { id } = req.params;
+  const { points, endTime } = req.body;
+  const idx = routesList.findIndex(r => r.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'not found' });
+  if (points && Array.isArray(points) && points.length > 0) {
+    routesList[idx].points = routesList[idx].points.concat(points);
+  }
+  if (endTime) {
+    routesList[idx].endTime = endTime;
+    console.log(`[${new Date().toLocaleString('ja-JP')}] ルート完了: ${id} 計${routesList[idx].points.length}pts`);
+  }
+  fs.writeFileSync(ROUTES_DATA, JSON.stringify(routesList));
+  res.json(routesList[idx]);
 });
 
 app.get('/device-ids', (req, res) => {

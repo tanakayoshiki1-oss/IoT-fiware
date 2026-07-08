@@ -279,6 +279,44 @@
     let points = [];
     let startFlagMarker = null, endFlagMarker = null;
     let trackingStartTime = null;
+    let liveRouteId = null;       // 途中保存したルートのID
+    let savedPointCount = 0;       // サーバーに送信済みの点数
+    const CHUNK_SIZE = 100;        // 何点ごとに途中保存するか
+    const MIN_DIST_M  = 10;        // 何m以上動いたら点を追加するか
+
+    function metersBetween(lat1, lng1, lat2, lng2) {
+      const R = 6371000;
+      const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    async function saveRouteChunk() {
+      const chunk = points.slice(savedPointCount);
+      if (chunk.length === 0) return;
+      try {
+        if (!liveRouteId) {
+          const r = await fetch('route', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceId, authorName: deviceName, points: chunk, startTime: trackingStartTime }),
+          });
+          const saved = await r.json();
+          liveRouteId = saved.id;
+        } else {
+          await fetch(`route/${liveRouteId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ points: chunk }),
+          });
+        }
+        savedPointCount = points.length;
+      } catch (e) {
+        console.warn('チャンク保存失敗:', e);
+      }
+    }
 
     const startFlagIcon = L.divIcon({
       html: '<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:22px;line-height:1;">🚩</div>',
@@ -630,6 +668,7 @@
     function startTracking() {
       if (!navigator.geolocation) { alert('このブラウザはGeolocationに対応していません'); return; }
       points = []; polyline.setLatLngs([]);
+      liveRouteId = null; savedPointCount = 0;
       trackingStartTime = new Date().toISOString();
       if (startFlagMarker) { startFlagMarker.remove(); startFlagMarker = null; }
       if (endFlagMarker)   { endFlagMarker.remove();   endFlagMarker = null; }
@@ -649,7 +688,14 @@
         const { latitude:lat, longitude:lng, speed, accuracy } = pos.coords;
         const now = Date.now();
         currentLat = lat; currentLng = lng;
-        points.push([lat, lng]); polyline.setLatLngs(points); map.setView([lat, lng]);
+        // 10m 以上移動したときだけ点を追加（静止時のノイズ除去）
+        const lastPt = points[points.length - 1];
+        if (!lastPt || metersBetween(lastPt[0], lastPt[1], lat, lng) >= MIN_DIST_M) {
+          points.push([lat, lng]); polyline.setLatLngs(points);
+          // 100点ごとにサーバーへ途中保存
+          if ((points.length - savedPointCount) >= CHUNK_SIZE) saveRouteChunk();
+        }
+        map.setView([lat, lng]);
         if (points.length === 1 && !startFlagMarker) {
           // getCurrentPosition が失敗した場合のフォールバック
           startFlagMarker = L.marker([lat, lng], { icon: startFlagIcon, zIndexOffset: 100 }).addTo(map);
@@ -664,21 +710,35 @@
       }, err => setStatus('位置情報エラー: ' + err.message), { enableHighAccuracy:true, maximumAge:0 });
     }
 
-    function stopTracking() {
+    async function stopTracking() {
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
       document.getElementById('btnStart').disabled = false;
       document.getElementById('btnStop').disabled = true;
       setStatus(`完了 - ${points.length}ポイント記録`);
       fetch('tracking', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active:false, deviceId}) });
       if (points.length >= 1) {
-        fetch('route', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deviceId, authorName: deviceName, points,
-            startTime: trackingStartTime, endTime: new Date().toISOString(),
-          }),
-        }).then(r => r.json()).then(saved => {
+        const endTime = new Date().toISOString();
+        const remainingPts = points.slice(savedPointCount);
+        try {
+          let saved;
+          if (!liveRouteId) {
+            // 途中保存なし：全点を一度に送信
+            const r = await fetch('route', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ deviceId, authorName: deviceName, points, startTime: trackingStartTime, endTime }),
+            });
+            saved = await r.json();
+          } else {
+            // 途中保存あり：差分のみ送って完了マーク
+            const r = await fetch(`route/${liveRouteId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ points: remainingPts, endTime }),
+            });
+            saved = await r.json();
+          }
+          liveRouteId = null; savedPointCount = 0;
           // ライブ表示をクリアして保存済みスタイルで再描画
           if (startFlagMarker) { startFlagMarker.remove(); startFlagMarker = null; }
           if (endFlagMarker)   { endFlagMarker.remove();   endFlagMarker = null; }
@@ -686,12 +746,12 @@
           polyline.setLatLngs([]);
           drawSavedRoute(saved, true);
           setStatus(`保存完了 - ${points.length}ポイント`);
-        }).catch(() => {
+        } catch (e) {
           // 保存失敗時はライブ表示のまま
           if (points.length > 0) {
             endFlagMarker = L.marker(points[points.length - 1], { icon: endFlagIcon, zIndexOffset: 100 }).addTo(map);
           }
-        });
+        }
       }
     }
 
