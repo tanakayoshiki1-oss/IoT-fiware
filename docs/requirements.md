@@ -44,9 +44,19 @@ LINE を主な UI として利用し、Google Home Mini への音声出力、カ
 | UI | ブラウザ（HTTPS 必須） `/gps/` |
 | 操作 | スタート / エンド ボタンで区間記録 |
 | 送信間隔 | 5 秒ごとに位置情報を POST |
-| 保存先 | FIWARE Orion → Draco → PostgreSQL (`gpsroute.routes`) |
+| リアルタイム位置 | FIWARE Orion → Draco → PostgreSQL (`gpsroute.routes`) |
 | 可視化 | Grafana GPS ルートトラッカーダッシュボード |
 | 用途 | 移動ルートの記録・除排雪ルートなどの実測データ取得 |
+
+### F4-A: ルート記録・共有 ✅ 実装済み
+
+| 項目 | 内容 |
+|------|------|
+| ルート記録 | スタート〜エンド間の GPS 座標列をサーバーに保存（`routes-data.json`） |
+| 旗マーカー | スタート（🚩緑）・エンド（🏁赤）の地点に旗マーカーを表示 |
+| ルート共有 | ページ読み込み時に全デバイスのルートを取得して地図に描画。PC など他デバイスから全員のルートを俯瞰可能 |
+| PC 対応 | GPS 取得が遅い PC 向けに `getCurrentPosition`（低精度）でスタート地点を即時取得するフォールバック実装 |
+| 保存先 | Docker Volume（`iot_fiware_gps_data`）の `routes-data.json` に保存 |
 
 ### F4-B: GPS 連携写真機能 ✅ 実装済み
 

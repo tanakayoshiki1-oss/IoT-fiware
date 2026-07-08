@@ -396,21 +396,72 @@
     const photoMeta = new Map();
 
     function addPhotoMarker(lat, lng, url, timestamp, rating, comments, photoDeviceId) {
-      photoMeta.set(url, { rating: rating || 0, comments: comments || [] });
+      photoMeta.set(url, { rating: rating || 0, comments: comments || [], photoDeviceId });
       const time = new Date(timestamp).toLocaleString('ja-JP');
       const isOwn = photoDeviceId === deviceId;
       const icon = isOwn ? myPhotoIcon : otherPhotoIcon;
+
+      // HTML文字列ではなくDOM要素でポップアップを構築
+      // → Leaflet が innerHTML をリセットしないため isOwn 判定が初回から確実に効く
+      const content = document.createElement('div');
+      content.className = 'photo-popup';
+      content.dataset.url = url;
+      content.dataset.time = time;
+      content.dataset.photoDevice = photoDeviceId || '';
+
+      const imgEl = document.createElement('img');
+      imgEl.src = url;
+      content.appendChild(imgEl);
+
+      const ratingRow = document.createElement('div');
+      ratingRow.className = 'rating-row';
+
+      const starsEl = document.createElement('div');
+      starsEl.className = 'stars';
+      starsEl.innerHTML = buildStars(rating || 0);
+      starsEl.style.cursor = isOwn ? 'pointer' : 'default';
+      ratingRow.appendChild(starsEl);
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'save-rating';
+      saveBtn.textContent = '★保存';
+      saveBtn.style.display = isOwn ? '' : 'none';  // マーカー作成時に確定
+      ratingRow.appendChild(saveBtn);
+
+      content.appendChild(ratingRow);
+
+      const timeEl = document.createElement('small');
+      timeEl.textContent = time;
+      content.appendChild(timeEl);
+
+      if (isOwn) {
+        starsEl.onclick = function(ev) {
+          const star = ev.target.closest('.star');
+          if (!star) return;
+          const newRating = parseInt(star.dataset.val);
+          starsEl.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('filled', i < newRating));
+          content.dataset.pendingRating = newRating;
+        };
+        saveBtn.onclick = function() {
+          const r = content.dataset.pendingRating !== undefined
+            ? parseInt(content.dataset.pendingRating)
+            : starsEl.querySelectorAll('.star.filled').length;
+          fetch('photo-meta', {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ url, rating: r, deviceId }),
+          }).then(res => res.json()).then(() => {
+            const cached = photoMeta.get(url) || {};
+            photoMeta.set(url, { ...cached, rating: r });
+            delete content.dataset.pendingRating;
+            saveBtn.textContent = '✓保存';
+            setTimeout(() => { saveBtn.textContent = '★保存'; }, 2000);
+          }).catch(() => { saveBtn.textContent = 'エラー'; });
+        };
+      }
+
       const m = L.marker([lat, lng], { icon })
-        .bindPopup(`
-          <div class="photo-popup" data-url="${url}" data-time="${escapeHtml(time)}" data-photo-device="${escapeHtml(photoDeviceId)}">
-            <img src="${url}">
-            <div class="rating-row">
-              <div class="stars">${buildStars(rating || 0)}</div>
-              <button class="save-rating">★保存</button>
-            </div>
-            <small>${time}</small>
-          </div>
-        `, { maxWidth: 260 })
+        .bindPopup(content, { maxWidth: 260 })
         .addTo(map);
       return m;
     }
@@ -467,58 +518,24 @@
         };
       }
 
-      // 写真のdeviceIdとその時点のdeviceIdを比較（単一判定ロジック）
-      const isOwn = popup.dataset.photoDevice === deviceId;
-      const starsEl = popup.querySelector('.stars');
-      const saveBtn = popup.querySelector('.save-rating');
-
-      // キャッシュ値で即時表示・onclick を fetch 前にセット
-      let currentRating = (photoMeta.get(currentPopupUrl) || {}).rating || 0;
-      let userInteracted = false;
-
-      if (!isOwn) {
-        if (saveBtn) saveBtn.style.display = 'none';
-        if (starsEl) starsEl.style.cursor = 'default';
-      } else {
-        if (starsEl) {
-          starsEl.innerHTML = buildStars(currentRating);
-          starsEl.onclick = function(ev) {
-            const star = ev.target.closest('.star');
-            if (!star) return;
-            userInteracted = true;
-            currentRating = parseInt(star.dataset.val);
-            starsEl.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('filled', i < currentRating));
-          };
-        }
-        if (saveBtn) {
-          saveBtn.onclick = function() {
-            fetch('photo-meta', {
-              method: 'PATCH',
-              headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({ url: currentPopupUrl, rating: currentRating, deviceId }),
-            }).then(r => r.json()).then(() => {
-              const cached = photoMeta.get(currentPopupUrl) || {};
-              photoMeta.set(currentPopupUrl, { ...cached, rating: currentRating });
-              saveBtn.textContent = '✓保存';
-              setTimeout(() => { saveBtn.textContent = '★保存'; }, 2000);
-            }).catch(() => { saveBtn.textContent = 'エラー'; });
-          };
-        }
-      }
-
       // コメントボタンを表示（チャットパネルが閉じているときのみ）
       if (document.getElementById('chat-panel').style.display !== 'block') {
         document.getElementById('float-comment-btn').style.display = 'block';
       }
 
-      // サーバーから最新評価を取得して未操作なら表示を更新
+      // saveBtn の show/hide・onclick は addPhotoMarker 時点で確定済み
+      // ここではサーバーから最新評価を取得してユーザー未操作時のみ星表示を更新
+      const starsEl = popup.querySelector('.stars');
+      const hasPending = popup.dataset.pendingRating !== undefined;
+
       try {
         const r = await fetch(`photo-detail?url=${encodeURIComponent(currentPopupUrl)}`);
         const photo = await r.json();
-        photoMeta.set(currentPopupUrl, { rating: photo.rating || 0, comments: photo.comments || [] });
-        if (!userInteracted && currentPopupUrl) {
-          currentRating = photo.rating || 0;
-          if (starsEl) starsEl.innerHTML = buildStars(currentRating);
+        const serverRating = photo.rating || 0;
+        const cached = photoMeta.get(currentPopupUrl) || {};
+        photoMeta.set(currentPopupUrl, { ...cached, rating: serverRating, comments: photo.comments || [] });
+        if (!hasPending && starsEl && currentPopupUrl) {
+          starsEl.innerHTML = buildStars(serverRating);
         }
       } catch (_) {}
     });
