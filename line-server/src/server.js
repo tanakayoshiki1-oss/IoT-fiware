@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { say, handleVolumeCommand } = require('./googleHome');
-const { replyText, replyImage } = require('./lineApi');
+const { replyText, replyImage, pushText } = require('./lineApi');
 const { updatePhoto } = require('./orion');
 const picarx = require('./picarx');
 const localllm = require('./localllm');
@@ -35,13 +35,21 @@ app.post('/webhook', async (req, res) => {
       handleVolumeCommand(text)
         .catch(err => console.error('コマンドエラー:', err));
     } else {
-      handleAgentChat(text, replyToken)
+      handleAgentChat(text, replyToken, userId)
         .catch(err => console.error('agentチャットエラー:', err.message));
     }
   }
 });
 
-async function handleAgentChat(text, replyToken) {
+// localllm の応答に30秒前後かかるため、reply token は即座の受付連絡に使い切り、
+// 本回答は push API（userId 宛）で別メッセージとして後から送る。
+async function handleAgentChat(text, replyToken, userId) {
+  try {
+    await replyText(replyToken, 'AIがメッセージを受け付けました。回答するまでしばらくお待ちください。');
+  } catch (err) {
+    console.error('受付連絡の返信に失敗:', err.message);
+  }
+
   let answer;
   try {
     const response = await localllm.chat(text);
@@ -50,16 +58,14 @@ async function handleAgentChat(text, replyToken) {
       : '(localllmから応答がありませんでした)';
   } catch (err) {
     console.error('localllm呼び出しエラー:', err.message);
-    await replyText(replyToken, 'すみません、応答できませんでした。しばらくしてからもう一度お試しください。')
-      .catch(replyErr => console.error('エラー通知の返信にも失敗:', replyErr.message));
-    return;
+    answer = 'すみません、応答できませんでした。しばらくしてからもう一度お試しください。';
   }
 
   try {
-    await replyText(replyToken, answer);
-    console.log(`agent応答: ${answer}`);
+    await pushText(userId, answer);
+    console.log(`agent応答(push): ${answer}`);
   } catch (err) {
-    console.error('LINE返信エラー:', err.message);
+    console.error('LINE push送信エラー:', err.message);
   }
 }
 
